@@ -16,7 +16,7 @@ __pycache__/
 .env
 .env.*
 *.env
-
+!.env.example
 # Logs e SO
 *.log
 .DS_Store
