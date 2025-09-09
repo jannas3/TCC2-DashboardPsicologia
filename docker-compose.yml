@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ifam-postgres
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ifam} -d ${POSTGRES_DB:-ifam_psico}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ifam-backend
+    restart: always
+    env_file:
+      - ./backend/.env
+    working_dir: /app
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: sh -c "npm ci || npm install && npx prisma generate && npm run dev"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ifam-frontend
+    restart: always
+    env_file:
+      - ./frontend/.env
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm ci || npm install && npm run dev"
+
+volumes:
+  postgres_data:
