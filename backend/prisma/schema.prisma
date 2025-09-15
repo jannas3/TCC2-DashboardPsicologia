@@ -1,3 +1,4 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,26 +16,47 @@ enum RiskLevel {
   GRAVE
 }
 
+// >>> NOVO: status da triagem
+enum ScreeningStatus {
+  NEW
+  REVIEWED
+  SCHEDULED
+  CONVERTED
+  ARCHIVED
+}
+
+// >>> NOVO: status de agendamento
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  DONE
+  NO_SHOW
+  CANCELLED
+}
+
 model Student {
-  id         String    @id @default(cuid())
-  telegramId String?   // se quiser vincular usuário do Telegram
+  id         String   @id @default(cuid())
+  telegramId String?
   nome       String
   idade      Int
-  matricula  String    @unique
+  matricula  String   @unique
   curso      String
   periodo    String
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime @default(now())
 
   screenings Screening[]
+  // opcional (não é necessário para funcionar, mas útil se quiser navegar):
+  // appointments Appointment[]
 }
 
 model Screening {
-  id              String    @id @default(cuid())
-  studentId       String
-  student         Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  phq9Respostas   Int[]     // [0..3] x 9
+  id        String  @id @default(cuid())
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  phq9Respostas   Int[] // [0..3] x 9
   phq9Score       Int
-  gad7Respostas   Int[]     // [0..3] x 7
+  gad7Respostas   Int[] // [0..3] x 7
   gad7Score       Int
   disponibilidade String
   observacao      String?
@@ -42,4 +64,33 @@ model Screening {
   riskPHQ9        RiskLevel
   riskGAD7        RiskLevel
   createdAt       DateTime  @default(now())
+
+  // >>> NOVO: controlar o fluxo da triagem
+  status ScreeningStatus @default(NEW)
+
+  // relação 1–1 opcional com agendamento (se a triagem já foi agendada)
+  appointment Appointment?
+}
+
+// >>> NOVO: agendamentos
+model Appointment {
+  id String @id @default(cuid())
+
+  // vincular uma triagem (opcional) — 1:1
+  screeningId String?    @unique
+  screening   Screening? @relation(fields: [screeningId], references: [id])
+
+  // se quiser abrir caso depois, pode usar caseId (opcional)
+  caseId String?
+
+  startsAt     DateTime
+  endsAt       DateTime
+  durationMin  Int // 30 | 50 | 60 | 90...
+  channel      String // "presencial" | "online"
+  professional String // nome/identificação do profissional
+  status       AppointmentStatus @default(PENDING)
+  note         String?
+
+  // ajuda a checar conflitos (profissional x janela de tempo)
+  @@index([professional, startsAt, endsAt])
 }

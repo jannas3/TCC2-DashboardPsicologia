@@ -15,18 +15,25 @@ import {
   DialogActions,
   Button,
   InputAdornment,
+  CircularProgress,
 } from "@mui/material";
 import {
   DataGrid,
   GridToolbarContainer,
+  GridToolbarExport,
+  GridToolbarDensitySelector,
   type GridColDef,
   type GridRenderCellParams,
 } from "@mui/x-data-grid";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import EventIcon from "@mui/icons-material/Event";
 import SearchIcon from "@mui/icons-material/Search";
+
+import AgendarDialog from "@/app/dashboard/triagem/AgendarDialog";
 import { getScreenings, type Screening, type RiskLevel } from "@/lib/api";
 
+// --- helpers de risco ---
 const riskLabel: Record<RiskLevel, string> = {
   MINIMO: "Mínimo",
   LEVE: "Leve",
@@ -34,34 +41,49 @@ const riskLabel: Record<RiskLevel, string> = {
   MODERADAMENTE_GRAVE: "Mod. Grave",
   GRAVE: "Grave",
 };
-
-const riskColor: Record<
-  RiskLevel,
-  "default" | "success" | "warning" | "error" | "info"
-> = {
+const riskColor: Record<RiskLevel, "default" | "success" | "warning" | "error" | "info"> = {
   MINIMO: "success",
   LEVE: "info",
   MODERADO: "warning",
   MODERADAMENTE_GRAVE: "warning",
   GRAVE: "error",
 };
-
+const riskWeight: Record<RiskLevel, number> = {
+  MINIMO: 0,
+  LEVE: 1,
+  MODERADO: 2,
+  MODERADAMENTE_GRAVE: 3,
+  GRAVE: 4,
+};
+function getOverallRisk(row: Screening): RiskLevel {
+  const a = row.riskPHQ9;
+  const b = row.riskGAD7;
+  return riskWeight[a] >= riskWeight[b] ? a : b;
+}
 function RiskChip({ level }: { level: RiskLevel }) {
   return <Chip size="small" color={riskColor[level]} label={riskLabel[level]} />;
 }
+function formatDateTime(d?: Date | null) {
+  return d
+    ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(d)
+    : "";
+}
 
+// --- Toolbar ---
 function CustomToolbar({
   onRefresh,
   query,
   setQuery,
+  loading,
 }: {
   onRefresh: () => void;
   query: string;
   setQuery: (v: string) => void;
+  loading: boolean;
 }) {
   return (
     <GridToolbarContainer>
-      <Stack direction="row" spacing={2} sx={{ width: "100%", p: 1 }}>
+      <Stack direction="row" spacing={2} sx={{ width: "100%", p: 1, alignItems: "center" }}>
         <TextField
           size="small"
           placeholder="Buscar por aluno, matrícula, curso…"
@@ -77,10 +99,14 @@ function CustomToolbar({
           sx={{ minWidth: 320 }}
         />
         <Box flex={1} />
+        <GridToolbarDensitySelector />
+        <GridToolbarExport csvOptions={{ utf8WithBom: true, fileName: "triagens" }} />
         <Tooltip title="Atualizar">
-          <IconButton onClick={onRefresh}>
-            <RefreshIcon />
-          </IconButton>
+          <span>
+            <IconButton onClick={onRefresh} disabled={loading} aria-label="Atualizar lista">
+              {loading ? <CircularProgress size={18} /> : <RefreshIcon />}
+            </IconButton>
+          </span>
         </Tooltip>
       </Stack>
     </GridToolbarContainer>
@@ -88,11 +114,13 @@ function CustomToolbar({
 }
 
 export default function Page() {
+  // --- hooks dentro do componente ---
   const [rows, setRows] = useState<Screening[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<Screening | null>(null);
+  const [agendarFor, setAgendarFor] = useState<Screening | null>(null);
 
   const load = async () => {
     try {
@@ -107,9 +135,11 @@ export default function Page() {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     load();
+    const onVis = () => document.visibilityState === "visible" && load();
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
   const filtered = useMemo(() => {
@@ -127,29 +157,22 @@ export default function Page() {
     });
   }, [rows, query]);
 
-  // v7: getters/formatters com nova assinatura
-  const columns: GridColDef<Screening>[] = [
-          {
-        field: "createdAt",
-        headerName: "Data",
-        width: 170,
-        type: "dateTime", // ajuda o DataGrid a entender o tipo
-        valueGetter: (_value, row) => (row?.createdAt ? new Date(row.createdAt) : null),
-        valueFormatter: (value: unknown) => {
-          const d = value as Date | null;
-          return d
-            ? new Intl.DateTimeFormat("pt-BR", {
-                dateStyle: "short",
-                timeStyle: "short",
-              }).format(d)
-            : "";
-        },
-      },
+  const onAgendar = (row: Screening) => setAgendarFor(row);
 
+  // --- colunas ---
+  const columns: GridColDef<Screening>[] = [
+    {
+      field: "createdAt",
+      headerName: "Data",
+      width: 170,
+      type: "dateTime",
+      valueGetter: (_v, row) => (row?.createdAt ? new Date(row.createdAt) : null),
+      valueFormatter: (v) => formatDateTime(v as Date | null),
+    },
     {
       field: "nome",
       headerName: "Aluno",
-      width: 180,
+      width: 200,
       valueGetter: (_value, row) => row?.student?.nome ?? "",
     },
     {
@@ -161,15 +184,25 @@ export default function Page() {
     {
       field: "cursoPeriodo",
       headerName: "Curso / Período",
-      width: 200,
+      width: 220,
       valueGetter: (_value, row) =>
-        `${row?.student?.curso ?? ""} • ${row?.student?.periodo ?? ""}`,
+        [row?.student?.curso, row?.student?.periodo].filter(Boolean).join(" • "),
     },
-    { field: "phq9Score", headerName: "PHQ-9", width: 90 },
-    { field: "gad7Score", headerName: "GAD-7", width: 90 },
+    { field: "phq9Score", headerName: "PHQ-9", width: 90, type: "number" },
+    { field: "gad7Score", headerName: "GAD-7", width: 90, type: "number" },
     {
-      field: "risco",
+      // sorteia pelo peso numérico e renderiza chip
+      field: "riscoGeral",
       headerName: "Risco",
+      width: 120,
+      type: "number",
+      valueGetter: (_v, row) => riskWeight[getOverallRisk(row)],
+      renderCell: (p) => <RiskChip level={getOverallRisk(p.row)} />,
+      sortable: true,
+    },
+    {
+      field: "riscoDetalhe",
+      headerName: "PHQ/GAD",
       width: 170,
       renderCell: (p: GridRenderCellParams<Screening>) => {
         const r = p?.row;
@@ -188,20 +221,12 @@ export default function Page() {
     {
       field: "observacao",
       headerName: "Observação",
-      width: 200,
+      width: 220,
       renderCell: (p: GridRenderCellParams<Screening, string | undefined>) => {
-        const val = p?.value ?? "";
+        const val = p?.value ?? p?.row?.observacao ?? "";
         return (
           <Tooltip title={val}>
-            <span
-              style={{
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                display: "block",
-                width: "100%",
-              }}
-            >
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", width: "100%" }}>
               {val}
             </span>
           </Tooltip>
@@ -211,13 +236,13 @@ export default function Page() {
     {
       field: "relatorio",
       headerName: "Relatório",
-      width: 120,
+      width: 110,
       renderCell: (p: GridRenderCellParams<Screening>) => {
         const row = p?.row;
         if (!row) return null;
         return (
           <Tooltip title="Ver relatório completo">
-            <IconButton color="primary" onClick={() => setOpen(row)}>
+            <IconButton color="primary" onClick={() => setOpen(row)} aria-label="Ver relatório">
               <VisibilityIcon />
             </IconButton>
           </Tooltip>
@@ -227,16 +252,30 @@ export default function Page() {
       filterable: false,
     },
     {
+      field: "acoes",
+      headerName: "Ações",
+      width: 120,
+      renderCell: (p: GridRenderCellParams<Screening>) => (
+        <Tooltip title="Agendar">
+          <IconButton onClick={() => onAgendar(p.row)} aria-label="Agendar atendimento">
+            <EventIcon />
+          </IconButton>
+        </Tooltip>
+      ),
+      sortable: false,
+      filterable: false,
+    },
+    {
       field: "telegramId",
       headerName: "Telegram ID",
       width: 140,
       valueGetter: (_value, row) => row?.student?.telegramId ?? "",
+      // ❌ 'hide' saiu no v7; usamos columnVisibilityModel no initialState
     },
   ];
 
-  // Wrapper sem props para o toolbar (fecha sobre load/query/setQuery)
   const ToolbarWrapper = () => (
-    <CustomToolbar onRefresh={load} query={query} setQuery={setQuery} />
+    <CustomToolbar onRefresh={load} query={query} setQuery={setQuery} loading={loading} />
   );
 
   return (
@@ -246,9 +285,10 @@ export default function Page() {
       </Typography>
 
       {error && (
-        <Typography color="error" sx={{ mb: 2 }}>
-          {error}
-        </Typography>
+        <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+          <Typography color="error">{error}</Typography>
+          <Button size="small" onClick={load} variant="outlined">Tentar novamente</Button>
+        </Stack>
       )}
 
       <Box
@@ -268,11 +308,13 @@ export default function Page() {
           initialState={{
             sorting: { sortModel: [{ field: "createdAt", sort: "desc" }] },
             pagination: { paginationModel: { pageSize: 10, page: 0 } },
+            columns: { columnVisibilityModel: { telegramId: false } }, // 👈 substitui 'hide'
           }}
           pageSizeOptions={[10, 25, 50, 100]}
         />
       </Box>
 
+      {/* Dialog: relatório */}
       <Dialog open={!!open} onClose={() => setOpen(null)} maxWidth="md" fullWidth>
         <DialogTitle>Relatório da Triagem</DialogTitle>
         <DialogContent dividers>
@@ -281,8 +323,9 @@ export default function Page() {
               Aluno: {open?.student?.nome} • Matrícula: {open?.student?.matricula}
             </Typography>
             <Typography variant="subtitle2">
-              PHQ-9: {open?.phq9Score} • GAD-7: {open?.gad7Score} • Risco:{" "}
-              {open && `${riskLabel[open.riskPHQ9]} / ${riskLabel[open.riskGAD7]}`}
+              PHQ-9: {open?.phq9Score} • GAD-7: {open?.gad7Score} • Riscos:{" "}
+              {open && `${riskLabel[open.riskPHQ9]} / ${riskLabel[open.riskGAD7]}`} • Geral:{" "}
+              {open && riskLabel[getOverallRisk(open)]}
             </Typography>
             <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", mt: 1 }}>
               {open?.relatorio}
@@ -293,6 +336,17 @@ export default function Page() {
           <Button onClick={() => setOpen(null)}>Fechar</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Dialog: agendar */}
+      <AgendarDialog
+        open={!!agendarFor}
+        onClose={() => setAgendarFor(null)}
+        screening={agendarFor}
+        onSaved={() => {
+          setAgendarFor(null);
+          load(); // recarrega
+        }}
+      />
     </Box>
   );
 }
