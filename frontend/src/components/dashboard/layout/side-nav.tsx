@@ -59,15 +59,29 @@ export function SideNav(): React.JSX.Element {
               display: "flex",
               alignItems: "center",
               textDecoration: "none",
+              gap: "8px",
             }}
           >
-            <Image src="/logo-ifam.png" alt="IFAM" width={38} height={48} />
+            <Image 
+              src="/logo-ifam.png" 
+              alt="IFAM" 
+              width={32} 
+              height={40}
+              style={{ 
+                objectFit: "contain",
+                flexShrink: 0
+              }}
+            />
             <Typography
               variant="h6"
-              sx={{ ml: 1 }}
+              sx={{ 
+                fontWeight: 600,
+                fontSize: "1.1rem",
+                letterSpacing: "-0.01em"
+              }}
               color="var(--mui-palette-neutral-100)"
             >
-              Psicologia
+              Psicoflow
             </Typography>
           </Link>
         </Box>

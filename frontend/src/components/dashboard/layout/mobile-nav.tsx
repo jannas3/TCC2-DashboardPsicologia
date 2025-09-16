@@ -61,9 +61,26 @@ export function MobileNav({ open, onClose }: MobileNavProps): React.JSX.Element 
     >
       <Box sx={{ px: 2, pt: 2, pb: 1 }}>
         <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-         <Image src="/logo-ifam.png" alt="" width={28} height={28} />
-          <Typography variant="h6" color="var(--mui-palette-neutral-100)">
-            Psicologia
+         <Image 
+           src="/logo-ifam.png" 
+           alt="IFAM" 
+           width={24} 
+           height={30}
+           style={{ 
+             objectFit: "contain",
+             flexShrink: 0
+           }}
+         />
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              fontWeight: 600,
+              fontSize: "1rem",
+              letterSpacing: "-0.01em"
+            }}
+            color="var(--mui-palette-neutral-100)"
+          >
+            Psicoflow
           </Typography>
         </Link>
       </Box>

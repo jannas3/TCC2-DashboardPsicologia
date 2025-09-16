@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 
 import appointmentRoutes from "./modules/appointment/appointment.routes.js";
 import screeningRoutes from "./modules/screening/screening.routes.js";
+import studentRoutes from "./modules/student/student.routes.js";
 
 const app = express();
 
@@ -20,8 +21,11 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/screenings", screeningRoutes);
+app.use("/api/students", studentRoutes);
 
-const PORT = Number(process.env.PORT || 4000);
-app.listen(PORT, () => console.log(`API listening on http://localhost:${PORT}`));
+
+
+const PORT = Number(process.env.PORT ?? 4000);
+app.listen(PORT, "0.0.0.0", () => console.log(`API on http://localhost:${PORT}`));
 
 export default app;
