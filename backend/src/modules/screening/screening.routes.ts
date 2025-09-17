@@ -1,18 +1,11 @@
 ﻿import { Router } from "express";
-import { postScreening, getScreenings } from "./screening.controller.js";
+import { postScreening } from "./screening.controller.js";
 import { botAuth } from "../../middlewares/botAuth.js";
 import { prisma } from "../../db/prisma.js";
 
 const router = Router();
 
 // GET para visualizar no navegador
-router.get("/screenings", getScreenings);
-
-// POST protegido (usado pelo bot)
-router.post("/screenings", botAuth, postScreening);
-
-
-
 router.get("/", async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit ?? 50), 500);
@@ -38,6 +31,9 @@ router.get("/", async (req, res) => {
     return res.status(500).send("Erro ao listar triagens");
   }
 });
+
+// POST protegido (usado pelo bot)
+router.post("/", botAuth, postScreening);
 
 // PATCH /api/screenings/:id/status  { status }
 router.patch("/:id/status", async (req, res) => {
