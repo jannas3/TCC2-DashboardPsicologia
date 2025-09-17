@@ -161,3 +161,40 @@ export async function noShowAppointment(id: string): Promise<Appointment> {
   const res = await fetch(`${BASE_URL}/api/appointments/${id}/no-show`, { method: "POST" });
   return okOrThrow<Appointment>(res);
 }
+
+// ---------- SESSION NOTES ----------
+export interface SessionNote {
+  id: string;
+  appointmentId: string;
+  studentId: string;
+  createdAt: string;
+  updatedAt: string;
+  before?: string | null;
+  complaint?: string | null;
+  summary?: string | null;
+  observation?: string | null;
+  evolution?: string | null;
+  sharedField?: string | null;
+  fixedNote?: string | null;
+}
+
+export type SessionNotePatch = Partial<
+  Omit<SessionNote, "id" | "appointmentId" | "studentId" | "createdAt" | "updatedAt">
+> & { studentId: string };
+
+export async function getSessionNote(appointmentId: string): Promise<SessionNote | null> {
+  const res = await fetch(`${BASE_URL}/api/appointments/${appointmentId}/note`, { cache: "no-store" });
+  return okOrThrow<SessionNote | null>(res);
+}
+
+export async function upsertSessionNote(
+  appointmentId: string,
+  data: SessionNotePatch
+): Promise<SessionNote> {
+  const res = await fetch(`${BASE_URL}/api/appointments/${appointmentId}/note`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return okOrThrow<SessionNote>(res);
+}

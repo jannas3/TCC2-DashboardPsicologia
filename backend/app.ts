@@ -3,46 +3,52 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 
-// ATENÇÃO: com tsconfig "NodeNext", os imports internos devem terminar com .js
-// Quando trocar para o router definitivo, use:
-// import studentRoutes from "./modules/student/student.routes.js";
+// ⚠️ Com tsconfig moduleResolution: "NodeNext", use .js nos imports internos
+import studentRoutes from "../backend/src//modules/student/student.routes.js";
+import screeningRoutes from "../backend/src//modules/screening/screening.routes.js";
+import appointmentRoutes from "../backend/src//modules/appointment/appointment.routes.js";
+import sessionNoteRoutes from "../backend/src//modules/session-note/sessionNote.routes.js";
 
 const app = express();
 
-app.use(cors());
+// CORS (uma vez só)
+app.use(
+  cors({
+    origin: process.env.FRONTEND_ORIGIN || "http://localhost:3000",
+    credentials: false,
+  })
+);
+
+// Body parser + logs
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan("dev"));
 
 // Healthcheck
-app.get("/api/health", (_req, res) => res.send("ok"));
+app.get("/api/health", (_req, res) =>
+  res.json({
+    ok: true,
+    env: process.env.NODE_ENV || "development",
+    time: new Date().toISOString(),
+  })
+);
 
-// 🔧 TEMPORÁRIO: rota direta só para garantir 200 em /api/students (sem 404)
-app.get("/api/students", async (_req, res) => {
-  try {
-    // Tenta usar Prisma se existir configurado
-    const { prisma } = await import("./src/db/prisma").catch(() => ({ prisma: null as any }));
-    if (prisma) {
-      const items = await prisma.student.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
-      return res.json(items);
-    }
-  } catch (_) {
-    // se der erro de banco, segue para fallback
-  }
-  // Fallback: responde lista vazia (o importante é NÃO ser 404)
-  return res.json([]);
-});
-
-// (opcional) debug: ver rotas montadas
-app.get("/api/_routes", (req, res) => {
+// Debug simples: lista os paths diretos registrados
+app.get("/api/_routes", (_req, res) => {
   // @ts-ignore
   const stack = app._router?.stack ?? [];
   const routes = stack
-    .filter((l: any) => l.route?.path)
+    .filter((l: any) => l?.route?.path)
     .map((l: any) => `${Object.keys(l.route.methods).join(",").toUpperCase()} ${l.route.path}`);
   res.json(routes);
 });
 
-// 404 só para /api/*
+// ---- Rotas da API (ordem importa!) ----
+app.use("/api/students", studentRoutes);
+app.use("/api/screenings", screeningRoutes);
+app.use("/api/appointments", appointmentRoutes);
+app.use("/api/session-notes", sessionNoteRoutes);
+
+// 404 somente após TODAS as rotas
 app.use("/api", (_req, res) => res.status(404).send("Not Found"));
 
 export default app;

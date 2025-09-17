@@ -74,23 +74,38 @@ model Screening {
 
 // >>> NOVO: agendamentos
 model Appointment {
-  id String @id @default(cuid())
-
-  // vincular uma triagem (opcional) — 1:1
-  screeningId String?    @unique
-  screening   Screening? @relation(fields: [screeningId], references: [id])
-
-  // se quiser abrir caso depois, pode usar caseId (opcional)
-  caseId String?
-
+  id           String            @id @default(cuid())
+  screeningId  String?           @unique
+  screening    Screening?        @relation(fields: [screeningId], references: [id])
+  caseId       String?
   startsAt     DateTime
   endsAt       DateTime
-  durationMin  Int // 30 | 50 | 60 | 90...
-  channel      String // "presencial" | "online"
-  professional String // nome/identificação do profissional
+  durationMin  Int
+  channel      String
+  professional String
   status       AppointmentStatus @default(PENDING)
   note         String?
 
-  // ajuda a checar conflitos (profissional x janela de tempo)
+  // 👇 1–1 com a nota da sessão
+  sessionNote SessionNote?
+
   @@index([professional, startsAt, endsAt])
+}
+
+model SessionNote {
+  id            String      @id @default(cuid())
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  studentId     String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // campos da tela
+  before      String?
+  complaint   String?
+  summary     String?
+  observation String?
+  evolution   String?
+  sharedField String?
+  fixedNote   String?
 }

@@ -1,4 +1,3 @@
-// src/modules/appointment/appointment.routes.ts
 import { Router } from "express";
 import { prisma } from "../../db/prisma.js";
 
@@ -16,7 +15,7 @@ function overlapWhere(start: Date, end: Date, professional: string) {
   };
 }
 
-// POST /api/appointments  (criar)
+// ---------- CREATE ----------
 router.post("/", async (req, res) => {
   try {
     const { screeningId, studentId, startsAt, durationMin, professional, channel, note } =
@@ -84,16 +83,22 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/appointments?from&to  (listar)
+// ---------- LIST ----------
 router.get("/", async (req, res) => {
   try {
-    const { from, to } = req.query as { from?: string; to?: string };
+    const { from, to, status, professional, channel } = req.query as {
+      from?: string; to?: string; status?: Status; professional?: string; channel?: string;
+    };
     const where: any = {};
     if (from || to) {
       where.startsAt = {};
       if (from) where.startsAt.gte = new Date(from);
       if (to) where.startsAt.lte = new Date(to);
     }
+    if (status) where.status = status;
+    if (professional) where.professional = professional;
+    if (channel) where.channel = channel;
+
     const items = await prisma.appointment.findMany({
       where,
       orderBy: { startsAt: "asc" },
@@ -106,7 +111,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// PATCH /api/appointments/:id  (atualizar status/horário/info)
+// ---------- UPDATE (PATCH GENÉRICO) ----------
 router.patch("/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -162,6 +167,35 @@ router.patch("/:id", async (req, res) => {
     console.error(e);
     return res.status(500).send(e?.message ?? "Erro ao atualizar agendamento");
   }
+});
+
+// ---------- AÇÕES (para o frontend que usa POST /:id/...) ----------
+async function setStatus(id: string, status: Status) {
+  return prisma.appointment.update({ where: { id }, data: { status } });
+}
+router.post("/:id/confirm", async (req, res) => {
+  try {
+    const r = await setStatus(req.params.id, "CONFIRMED");
+    res.json(r);
+  } catch (e: any) { console.error(e); res.status(500).send("Falha ao confirmar"); }
+});
+router.post("/:id/done", async (req, res) => {
+  try {
+    const r = await setStatus(req.params.id, "DONE");
+    res.json(r);
+  } catch (e: any) { console.error(e); res.status(500).send("Falha ao concluir"); }
+});
+router.post("/:id/no-show", async (req, res) => {
+  try {
+    const r = await setStatus(req.params.id, "NO_SHOW");
+    res.json(r);
+  } catch (e: any) { console.error(e); res.status(500).send("Falha ao marcar falta"); }
+});
+router.post("/:id/cancel", async (req, res) => {
+  try {
+    const r = await setStatus(req.params.id, "CANCELLED");
+    res.json(r);
+  } catch (e: any) { console.error(e); res.status(500).send("Falha ao cancelar"); }
 });
 
 export default router;
