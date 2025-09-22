@@ -12,10 +12,14 @@ import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import TodayIcon from "@mui/icons-material/Today";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
+import EditNoteIcon from "@mui/icons-material/EditNote";
+import DeleteIcon from "@mui/icons-material/Delete";
+import CloseIcon from "@mui/icons-material/Close";
 
 import {
   listAppointments,
   doneAppointment,
+  deleteAppointment,       // 👈 excluir FORA do modal
   type Appointment,
   type AppointmentStatus,
   getSessionNote,
@@ -43,15 +47,9 @@ const statusColor = {
   CANCELLED: "error",
 } as const satisfies Record<Status, "default" | "info" | "success" | "warning" | "error">;
 
-function startOfDay(d = new Date()) {
-  const x = new Date(d); x.setHours(0,0,0,0); return x;
-}
-function endOfDay(d = new Date()) {
-  const x = new Date(d); x.setHours(23,59,59,999); return x;
-}
-function addDays(d: Date, n: number) {
-  const x = new Date(d); x.setDate(x.getDate()+n); return x;
-}
+function startOfDay(d = new Date()) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
+function endOfDay(d = new Date()) { const x = new Date(d); x.setHours(23,59,59,999); return x; }
+function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate()+n); return x; }
 const fmtDate = (d: Date) => new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(d);
 const fmtTime = (d: string | Date) =>
   new Intl.DateTimeFormat("pt-BR",{hour:"2-digit",minute:"2-digit"}).format(typeof d === "string" ? new Date(d) : d);
@@ -74,9 +72,9 @@ export default function AtendimentoPage() {
   async function load() {
     try {
       setLoading(true);
+      setErr(null);
       const appts = await listAppointments({ from: fromISO, to: toISO });
       setItems(appts);
-      setErr(null);
     } catch (e) {
       setErr((e as Error).message || "Erro ao carregar atendimentos");
     } finally {
@@ -85,8 +83,11 @@ export default function AtendimentoPage() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [fromISO, toISO]);
 
-  // abrir editor
+  // abrir editor (notas)
   async function openEditor(a: Appointment) {
+    // evita warning de aria-hidden/foco do DataGrid
+    (document.activeElement as HTMLElement | null)?.blur();
+
     setOpen(a); setMsg(null); setErr(null);
     try {
       const n = await getSessionNote(a.id);
@@ -104,19 +105,18 @@ export default function AtendimentoPage() {
     }
   }
 
+  // salvar (fecha modal); salvar & concluir (fecha modal e marca DONE)
   async function saveNote(markDone = false) {
     if (!open || !note) return;
     try {
       setSaving(true); setMsg(null); setErr(null);
       const { id: _ignore, createdAt: _c, updatedAt: _u, appointmentId, ...payload } = note as any;
-      const saved = await upsertSessionNote(open.id, payload);
-      setNote(saved);
-      setMsg("Anotações salvas.");
+      await upsertSessionNote(open.id, payload);
       if (markDone && open.status !== "DONE") {
         await doneAppointment(open.id);
-        await load();
-        setOpen({ ...open, status: "DONE" });
       }
+      setOpen(null);            // fecha modal
+      await load();             // atualiza grid
     } catch (e) {
       setErr((e as Error).message || "Falha ao salvar");
     } finally {
@@ -124,15 +124,24 @@ export default function AtendimentoPage() {
     }
   }
 
+  // excluir atendimento — FORA do modal, na coluna de ações
+  async function removeAppointment(id: string) {
+    if (!confirm("Deseja excluir este atendimento?")) return;
+    try {
+      await deleteAppointment(id);
+      if (open?.id === id) setOpen(null);
+      await load();
+    } catch (e) {
+      alert((e as Error).message || "Falha ao excluir atendimento.");
+    }
+  }
+
   const filtered = useMemo(() => {
-    return items.filter((a) => {
-      if (statusFilter === "__ALL__") return true;
-      return a.status === statusFilter;
-    });
+    return items.filter((a) => (statusFilter === "__ALL__" ? true : a.status === statusFilter));
   }, [items, statusFilter]);
 
   // Tipamos o row do grid para ter .student opcional
-  type Row = Appointment & { student?: { nome?: string } | null };
+  type Row = Appointment & { student?: { id?: string; nome?: string } | null };
 
   const columns: GridColDef<Row>[] = [
     { field: "startsAt", headerName: "Início", width: 100, valueFormatter: v => fmtTime(v as string) },
@@ -147,6 +156,43 @@ export default function AtendimentoPage() {
         return <Chip size="small" color={statusColor[s]} label={statusLabel[s]} />;
       },
       sortable: true,
+    },
+    // 👇 AÇÕES: Abrir (anotações) + Excluir (aqui do lado, NÃO no modal)
+    {
+      field: "acoes",
+      headerName: "Ações",
+      width: 200,
+      sortable: false,
+      filterable: false,
+      renderCell: (p) => (
+        <Stack direction="row" spacing={1}>
+          <Button
+            size="small"
+            startIcon={<EditNoteIcon />}
+            variant={p.row.status === "DONE" ? "contained" : "outlined"}
+            onClick={(e) => {
+              e.stopPropagation();
+              openEditor(p.row as Appointment);
+            }}
+          >
+            Abrir
+          </Button>
+          <Tooltip title="Excluir atendimento">
+            <span>
+              <IconButton
+                size="small"
+                color="error"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeAppointment(p.row.id);
+                }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
+      ),
     },
   ];
 
@@ -185,10 +231,25 @@ export default function AtendimentoPage() {
         />
       </Box>
 
-      <Dialog open={!!open} onClose={() => setOpen(null)} maxWidth="md" fullWidth>
-        <DialogTitle>
+      {/* Modal de anotações — centralizado por padrão; X para fechar; fechar após salvar */}
+      <Dialog
+        open={!!open}
+        onClose={() => setOpen(null)}
+        maxWidth="md"
+        fullWidth
+        disableRestoreFocus
+      >
+        <DialogTitle sx={{ pr: 6 }}>
           {open ? `${open.student?.nome ?? "Aluno"} — ${fmtTime(open.startsAt)}–${fmtTime(open.endsAt)}` : "Anotações"}
+          <IconButton
+            aria-label="Fechar"
+            onClick={() => setOpen(null)}
+            sx={{ position: "absolute", right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
         </DialogTitle>
+
         <DialogContent dividers>
           {err && <Typography color="error" sx={{ mb: 1 }}>{err}</Typography>}
           {msg && <Typography color="success.main" sx={{ mb: 1 }}>{msg}</Typography>}
@@ -210,6 +271,7 @@ export default function AtendimentoPage() {
               value={note?.fixedNote ?? ""} onChange={(e)=> setNote(n => n && ({...n, fixedNote: e.target.value}))} />
           </Stack>
         </DialogContent>
+
         <DialogActions>
           <Button onClick={() => setOpen(null)}>Fechar</Button>
           <Button startIcon={<SaveIcon />} variant="outlined" onClick={() => saveNote(false)} disabled={saving}>

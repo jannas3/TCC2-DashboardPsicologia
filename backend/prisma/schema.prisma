@@ -45,8 +45,7 @@ model Student {
   createdAt  DateTime @default(now())
 
   screenings Screening[]
-  // opcional (não é necessário para funcionar, mas útil se quiser navegar):
-  // appointments Appointment[]
+appointments Appointment[] @relation("StudentAppointments")
 }
 
 model Screening {
@@ -65,10 +64,7 @@ model Screening {
   riskGAD7        RiskLevel
   createdAt       DateTime  @default(now())
 
-  // >>> NOVO: controlar o fluxo da triagem
   status ScreeningStatus @default(NEW)
-
-  // relação 1–1 opcional com agendamento (se a triagem já foi agendada)
   appointment Appointment?
 }
 
@@ -77,6 +73,10 @@ model Appointment {
   id           String            @id @default(cuid())
   screeningId  String?           @unique
   screening    Screening?        @relation(fields: [screeningId], references: [id])
+
+  studentId    String?
+  student      Student?          @relation("StudentAppointments", fields: [studentId], references: [id], onDelete: SetNull)
+
   caseId       String?
   startsAt     DateTime
   endsAt       DateTime
@@ -86,11 +86,12 @@ model Appointment {
   status       AppointmentStatus @default(PENDING)
   note         String?
 
-  // 👇 1–1 com a nota da sessão
-  sessionNote SessionNote?
+  sessionNote  SessionNote?
 
   @@index([professional, startsAt, endsAt])
+  @@index([studentId])
 }
+
 
 model SessionNote {
   id            String      @id @default(cuid())

@@ -161,6 +161,11 @@ export async function noShowAppointment(id: string): Promise<Appointment> {
   const res = await fetch(`${BASE_URL}/api/appointments/${id}/no-show`, { method: "POST" });
   return okOrThrow<Appointment>(res);
 }
+export async function deleteAppointment(id: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/appointments/${id}`, { method: "DELETE" });
+  await okOrThrow(res);
+}
+
 
 // ---------- SESSION NOTES ----------
 export interface SessionNote {

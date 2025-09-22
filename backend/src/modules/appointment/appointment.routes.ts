@@ -1,9 +1,26 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { prisma } from "../../db/prisma.js";
 
 const router = Router();
 
 type Status = "PENDING" | "CONFIRMED" | "DONE" | "NO_SHOW" | "CANCELLED";
+
+// Janela de atendimento: 14h–18h
+const BUSINESS_START_HOUR = 14;
+const BUSINESS_END_HOUR = 18;
+
+function validateBusinessHours(start: Date, end: Date): string | null {
+  if (isNaN(+start) || isNaN(+end)) return "Datas inválidas.";
+  if (start >= end) return "Início deve ser antes do término.";
+  const startMinutes = start.getHours() * 60 + start.getMinutes();
+  const endMinutes = end.getHours() * 60 + end.getMinutes();
+  const min = BUSINESS_START_HOUR * 60;
+  const max = BUSINESS_END_HOUR * 60;
+  if (startMinutes < min || endMinutes > max) {
+    return `Atendimentos somente entre ${String(BUSINESS_START_HOUR).padStart(2, "0")}:00 e ${String(BUSINESS_END_HOUR).padStart(2, "0")}:00.`;
+  }
+  return null;
+}
 
 // checagem de sobreposição de horários
 function overlapWhere(start: Date, end: Date, professional: string) {
@@ -16,37 +33,50 @@ function overlapWhere(start: Date, end: Date, professional: string) {
 }
 
 // ---------- CREATE ----------
-router.post("/", async (req, res) => {
+router.post("/", async (req: Request, res: Response) => {
   try {
-    const { screeningId, studentId, startsAt, durationMin, professional, channel, note } =
-      (req.body ?? {}) as {
-        screeningId?: string;
-        studentId?: string;
-        startsAt: string;
-        durationMin: number;
-        professional: string;
-        channel: string;
-        note?: string;
-      };
+    const {
+      screeningId,
+      studentId,
+      startsAt,
+      durationMin,
+      professional,
+      channel,
+      note,
+    } = (req.body ?? {}) as {
+      screeningId?: string;
+      studentId?: string;
+      startsAt: string;
+      durationMin: number;
+      professional: string;
+      channel: string;
+      note?: string;
+    };
 
     if (!startsAt || !durationMin || !professional || !channel) {
-      return res.status(400).send("Campos obrigatórios: startsAt, durationMin, professional, channel.");
+      return res
+        .status(400)
+        .send("Campos obrigatórios: startsAt, durationMin, professional, channel.");
     }
 
-    // se não veio studentId mas veio screeningId, tenta inferir
-    let _studentId = studentId;
-    if (!_studentId && screeningId) {
+    // Se não veio studentId mas veio screeningId, tenta inferir
+    let effectiveStudentId = studentId;
+    if (!effectiveStudentId && screeningId) {
       const sc = await prisma.screening.findUnique({
         where: { id: screeningId },
         select: { studentId: true },
       });
-      if (sc?.studentId) _studentId = sc.studentId;
+      if (sc?.studentId) effectiveStudentId = sc.studentId;
     }
 
     const start = new Date(startsAt);
     const end = new Date(start.getTime() + Number(durationMin) * 60_000);
 
-    // conflito
+    // Valida janela 14–18h
+    const hourErr = validateBusinessHours(start, end);
+    if (hourErr) return res.status(422).send(hourErr);
+
+    // Conflito
     const conflicts = await prisma.appointment.findMany({
       where: overlapWhere(start, end, professional),
       select: { id: true, startsAt: true, endsAt: true },
@@ -58,6 +88,7 @@ router.post("/", async (req, res) => {
     const appt = await prisma.appointment.create({
       data: {
         screeningId: screeningId ?? null,
+        studentId: effectiveStudentId ?? null,
         caseId: null,
         startsAt: start,
         endsAt: end,
@@ -67,6 +98,7 @@ router.post("/", async (req, res) => {
         status: "PENDING",
         note: note ?? null,
       },
+      include: { student: { select: { id: true, nome: true, matricula: true } } },
     });
 
     if (screeningId) {
@@ -84,11 +116,16 @@ router.post("/", async (req, res) => {
 });
 
 // ---------- LIST ----------
-router.get("/", async (req, res) => {
+router.get("/", async (req: Request, res: Response) => {
   try {
     const { from, to, status, professional, channel } = req.query as {
-      from?: string; to?: string; status?: Status; professional?: string; channel?: string;
+      from?: string;
+      to?: string;
+      status?: Status;
+      professional?: string;
+      channel?: string;
     };
+
     const where: any = {};
     if (from || to) {
       where.startsAt = {};
@@ -103,6 +140,7 @@ router.get("/", async (req, res) => {
       where,
       orderBy: { startsAt: "asc" },
       take: 500,
+      include: { student: { select: { id: true, nome: true, matricula: true } } },
     });
     return res.json(items);
   } catch (e: any) {
@@ -112,7 +150,7 @@ router.get("/", async (req, res) => {
 });
 
 // ---------- UPDATE (PATCH GENÉRICO) ----------
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const { status, startsAt, durationMin, professional, channel, note } = req.body as {
@@ -124,20 +162,29 @@ router.patch("/:id", async (req, res) => {
       note?: string | null;
     };
 
-    const current = await prisma.appointment.findUnique({ where: { id } });
+    const current = await prisma.appointment.findUnique({
+      where: { id },
+      include: { student: { select: { id: true, nome: true, matricula: true } } },
+    });
     if (!current) return res.status(404).send("Agendamento não encontrado.");
 
-    // se alterar horário/profissional, validar conflito
+    // Se alterar horário/prof, validar conflito e janela 14–18h
     let nextStarts = current.startsAt;
     let nextEnds = current.endsAt;
     let nextProfessional = current.professional;
+    let nextDuration = current.durationMin;
 
     if (startsAt || durationMin || professional) {
       nextStarts = startsAt ? new Date(startsAt) : current.startsAt;
-      const dur = durationMin ?? current.durationMin;
-      nextEnds = new Date(nextStarts.getTime() + dur * 60_000);
+      nextDuration = durationMin ?? current.durationMin;
+      nextEnds = new Date(nextStarts.getTime() + nextDuration * 60_000);
       nextProfessional = professional ?? current.professional;
 
+      // Horário comercial
+      const hourErr = validateBusinessHours(nextStarts, nextEnds);
+      if (hourErr) return res.status(422).send(hourErr);
+
+      // Conflito
       const conflicts = await prisma.appointment.findMany({
         where: {
           ...overlapWhere(nextStarts, nextEnds, nextProfessional),
@@ -155,11 +202,12 @@ router.patch("/:id", async (req, res) => {
         status,
         startsAt: nextStarts,
         endsAt: nextEnds,
-        durationMin: durationMin ?? current.durationMin,
+        durationMin: nextDuration,
         professional: nextProfessional,
         channel: channel ?? current.channel,
         note: note ?? current.note,
       },
+      include: { student: { select: { id: true, nome: true, matricula: true } } },
     });
 
     return res.json(updated);
@@ -169,33 +217,116 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
-// ---------- AÇÕES (para o frontend que usa POST /:id/...) ----------
+// ---------- AÇÕES ----------
 async function setStatus(id: string, status: Status) {
-  return prisma.appointment.update({ where: { id }, data: { status } });
+  return prisma.appointment.update({
+    where: { id },
+    data: { status },
+    include: { student: { select: { id: true, nome: true, matricula: true } } },
+  });
 }
-router.post("/:id/confirm", async (req, res) => {
-  try {
-    const r = await setStatus(req.params.id, "CONFIRMED");
-    res.json(r);
-  } catch (e: any) { console.error(e); res.status(500).send("Falha ao confirmar"); }
+router.post("/:id/confirm", async (req: Request, res: Response) => {
+  try { res.json(await setStatus(req.params.id, "CONFIRMED")); }
+  catch (e: any) { console.error(e); res.status(500).send("Falha ao confirmar"); }
 });
-router.post("/:id/done", async (req, res) => {
-  try {
-    const r = await setStatus(req.params.id, "DONE");
-    res.json(r);
-  } catch (e: any) { console.error(e); res.status(500).send("Falha ao concluir"); }
+router.post("/:id/done", async (req: Request, res: Response) => {
+  try { res.json(await setStatus(req.params.id, "DONE")); }
+  catch (e: any) { console.error(e); res.status(500).send("Falha ao concluir"); }
 });
-router.post("/:id/no-show", async (req, res) => {
-  try {
-    const r = await setStatus(req.params.id, "NO_SHOW");
-    res.json(r);
-  } catch (e: any) { console.error(e); res.status(500).send("Falha ao marcar falta"); }
+router.post("/:id/no-show", async (req: Request, res: Response) => {
+  try { res.json(await setStatus(req.params.id, "NO_SHOW")); }
+  catch (e: any) { console.error(e); res.status(500).send("Falha ao marcar falta"); }
 });
-router.post("/:id/cancel", async (req, res) => {
-  try {
-    const r = await setStatus(req.params.id, "CANCELLED");
-    res.json(r);
-  } catch (e: any) { console.error(e); res.status(500).send("Falha ao cancelar"); }
+router.post("/:id/cancel", async (req: Request, res: Response) => {
+  try { res.json(await setStatus(req.params.id, "CANCELLED")); }
+  catch (e: any) { console.error(e); res.status(500).send("Falha ao cancelar"); }
 });
+
+// ---------- SESSION NOTES ----------
+router.get("/:id/note", async (req: Request, res: Response) => {
+  try {
+    const note = await prisma.sessionNote.findUnique({
+      where: { appointmentId: req.params.id },
+    });
+    // pode retornar null (frontend já trata)
+    return res.json(note);
+  } catch (e: any) {
+    console.error(e);
+    return res.status(500).send("Falha ao buscar nota");
+  }
+});
+
+router.put("/:id/note", async (req: Request, res: Response) => {
+  try {
+    const appointmentId = req.params.id;
+    const {
+      studentId,
+      before,
+      complaint,
+      summary,
+      observation,
+      evolution,
+      sharedField,
+      fixedNote,
+    } = (req.body ?? {}) as {
+      studentId?: string;
+      before?: string | null;
+      complaint?: string | null;
+      summary?: string | null;
+      observation?: string | null;
+      evolution?: string | null;
+      sharedField?: string | null;
+      fixedNote?: string | null;
+    };
+
+    if (!studentId) return res.status(400).send("studentId é obrigatório.");
+
+    const saved = await prisma.sessionNote.upsert({
+      where: { appointmentId },
+      create: {
+        appointmentId,
+        studentId,
+        before,
+        complaint,
+        summary,
+        observation,
+        evolution,
+        sharedField,
+        fixedNote,
+      },
+      update: {
+        studentId,
+        before,
+        complaint,
+        summary,
+        observation,
+        evolution,
+        sharedField,
+        fixedNote,
+      },
+    });
+
+    return res.json(saved);
+  } catch (e: any) {
+    console.error(e);
+    return res.status(500).send("Falha ao salvar nota");
+  }
+});
+
+// DELETE /api/appointments/:id
+router.delete("/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    await prisma.appointment.delete({ where: { id } });
+    // se houver SessionNote, o onDelete: Cascade no schema cuida da remoção
+    return res.status(204).end();
+  } catch (e: any) {
+    // registro não encontrado
+    if (e?.code === "P2025") return res.status(404).send("Agendamento não encontrado.");
+    console.error(e);
+    return res.status(500).send("Falha ao excluir agendamento.");
+  }
+});
+
 
 export default router;

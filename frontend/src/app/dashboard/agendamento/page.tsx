@@ -17,6 +17,7 @@ import {
   DialogActions,
   Button,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import {
   listAppointments,
   confirmAppointment,
@@ -34,9 +35,9 @@ import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
-/** Config padrão do calendário */
-const START_HOUR = 8;   // 08:00
-const END_HOUR = 20;    // 20:00
+/** Janela de atendimento: 14h–18h */
+const START_HOUR = 14;
+const END_HOUR = 18;
 const HOUR_HEIGHT = 56; // px por hora
 
 type Status = Appointment["status"];
@@ -57,7 +58,7 @@ const statusColor: Record<Status, "default" | "info" | "success" | "warning" | "
 
 function startOfWeek(date = new Date()) {
   const d = new Date(date);
-  const day = d.getDay(); // 0(dom) .. 6(sab)
+  const day = d.getDay();
   const diff = (day === 0 ? -6 : 1) - day; // começar na segunda
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
@@ -79,19 +80,18 @@ function clamp(n: number, min: number, max: number) {
 }
 
 export default function Page() {
-  // --- HOOKS: todos dentro do componente ---
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [items, setItems] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 👇 manter como string para não conflitar com o MenuItem/Select
   const [professional, setProfessional] = useState<string>("__ALL__");
   const [channel, setChannel] = useState<string>("__ALL__");
-  const [status, setStatus] = useState<Status | "__ALL__">("__ALL__");
+  const [status, setStatus] = useState<string>("__ALL__");
 
   const [selected, setSelected] = useState<Appointment | null>(null);
 
-  // 👇 estes 3 eram o problema — agora estão aqui dentro:
   const [mutating, setMutating] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [actError, setActError] = useState<string | null>(null);
@@ -123,13 +123,13 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromISO, toISO]);
 
-  // ações de status (Confirmar/Concluir/Falta/Cancelar)
-  async function runAction(fn: (id: string) => Promise<any>, okMessage: string) {
+  async function runAction(fn: (id: string) => Promise<Appointment>, okMessage: string) {
     if (!selected) return;
     try {
       setMutating(true);
       setActError(null);
-      await fn(selected.id);
+      const updated = await fn(selected.id);
+      setSelected(updated); // mantém modal sincronizado
       setMsg(okMessage);
       await load();
     } catch (e) {
@@ -139,22 +139,24 @@ export default function Page() {
     }
   }
 
-  // filtros dinâmicos
-  const professionals = useMemo(() => {
-    const s = new Set(items.map((i) => i.professional).filter(Boolean));
-    return ["__ALL__", ...Array.from(s)];
+  // filtros dinâmicos (removendo nulos/undefined)
+  const professionals = useMemo<string[]>(() => {
+    const vals = items.map((i) => i.professional).filter((v): v is string => !!v);
+    return ["__ALL__", ...Array.from(new Set(vals))];
   }, [items]);
 
-  const channels = useMemo(() => {
-    const s = new Set(items.map((i) => i.channel).filter(Boolean));
-    return ["__ALL__", ...Array.from(s)];
+  const channels = useMemo<string[]>(() => {
+    const vals = items.map((i) => i.channel ?? "").filter((v): v is string => v !== "");
+    return ["__ALL__", ...Array.from(new Set(vals))];
   }, [items]);
+
+  const statusOptions: string[] = ["__ALL__", "PENDING", "CONFIRMED", "DONE", "NO_SHOW", "CANCELLED"];
 
   const filtered = useMemo(() => {
     return items.filter((a) => {
       if (professional !== "__ALL__" && a.professional !== professional) return false;
       if (channel !== "__ALL__" && a.channel !== channel) return false;
-      if (status !== "__ALL__" && a.status !== status) return false;
+      if (status !== "__ALL__" && a.status !== (status as Status)) return false;
       return true;
     });
   }, [items, professional, channel, status]);
@@ -166,6 +168,7 @@ export default function Page() {
       const key = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
       (map[key] ??= []).push(ev);
     }
+    Object.values(map).forEach((arr) => arr.sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt)));
     return map;
   }, [filtered]);
 
@@ -185,7 +188,9 @@ export default function Page() {
           </Tooltip>
           <Tooltip title="Atualizar">
             <span>
-              <IconButton onClick={load} disabled={loading}>{loading ? <CircularProgress size={18} /> : <RefreshIcon />}</IconButton>
+              <IconButton onClick={load} disabled={loading}>
+                {loading ? <CircularProgress size={18} /> : <RefreshIcon />}
+              </IconButton>
             </span>
           </Tooltip>
         </Stack>
@@ -194,15 +199,39 @@ export default function Page() {
       {/* Filtros */}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
         <Stack direction="row" spacing={2}>
-          <Select size="small" value={professional} onChange={(e) => setProfessional(e.target.value)}>
-            {professionals.map((p) => <MenuItem key={p} value={p}>{p === "__ALL__" ? "Todos os profissionais" : p}</MenuItem>)}
+          <Select
+            size="small"
+            value={professional}
+            onChange={(e) => setProfessional(e.target.value as string)}
+          >
+            {professionals.map((p) => (
+              <MenuItem key={p} value={p}>
+                {p === "__ALL__" ? "Todos os profissionais" : p}
+              </MenuItem>
+            ))}
           </Select>
-          <Select size="small" value={channel} onChange={(e) => setChannel(e.target.value)}>
-            {channels.map((c) => <MenuItem key={c} value={c}>{c === "__ALL__" ? "Todos os canais" : c}</MenuItem>)}
+
+          <Select
+            size="small"
+            value={channel}
+            onChange={(e) => setChannel(e.target.value as string)}
+          >
+            {channels.map((c) => (
+              <MenuItem key={c} value={c}>
+                {c === "__ALL__" ? "Todos os canais" : c}
+              </MenuItem>
+            ))}
           </Select>
-          <Select size="small" value={status} onChange={(e) => setStatus(e.target.value as any)}>
-            {["__ALL__", "PENDING", "CONFIRMED", "DONE", "NO_SHOW", "CANCELLED"].map((s) => (
-              <MenuItem key={s} value={s as any}>{s === "__ALL__" ? "Todos os status" : statusLabel[s as Status]}</MenuItem>
+
+          <Select
+            size="small"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as string)}
+          >
+            {statusOptions.map((s) => (
+              <MenuItem key={s} value={s}>
+                {s === "__ALL__" ? "Todos os status" : statusLabel[s as Status]}
+              </MenuItem>
             ))}
           </Select>
         </Stack>
@@ -214,18 +243,11 @@ export default function Page() {
         </Typography>
       </Stack>
 
-      {/* Calendário semanal */}
-      <Box
-        sx={{
-          border: 1,
-          borderColor: "divider",
-          borderRadius: 2,
-          overflow: "hidden",
-        }}
-      >
+      {/* Calendário semanal (14h–18h) */}
+      <Box sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
         {/* Cabeçalho dos dias */}
         <Stack direction="row" sx={{ borderBottom: 1, borderColor: "divider", bgcolor: "background.paper" }}>
-          <Box sx={{ width: 72, p: 1 }} /> {/* coluna dos horários */}
+          <Box sx={{ width: 72, p: 1 }} />
           {weekDays.map((d, i) => (
             <Box key={i} sx={{ flex: 1, p: 1, textAlign: "center" }}>
               <Typography variant="subtitle2" sx={{ textTransform: "capitalize" }}>
@@ -235,7 +257,7 @@ export default function Page() {
           ))}
         </Stack>
 
-        {/* Corpo: grid de horários */}
+        {/* Corpo: grid (somente 14h–18h) */}
         <Box sx={{ position: "relative", display: "flex", height: (END_HOUR - START_HOUR) * HOUR_HEIGHT }}>
           {/* Coluna de horários */}
           <Box
@@ -251,12 +273,7 @@ export default function Page() {
               <Typography
                 key={i}
                 variant="caption"
-                sx={{
-                  position: "absolute",
-                  top: i * HOUR_HEIGHT - 7,
-                  right: 8,
-                  color: "text.secondary",
-                }}
+                sx={{ position: "absolute", top: i * HOUR_HEIGHT - 7, right: 8, color: "text.secondary" }}
               >
                 {String(START_HOUR + i).padStart(2, "0")}:00
               </Typography>
@@ -266,7 +283,15 @@ export default function Page() {
           {/* 7 colunas de dias */}
           {weekDays.map((day, idx) => {
             const key = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
-            const dayEvents = eventsByDay[key] || [];
+            const dayEvents = (eventsByDay[key] || []).filter((ev) => {
+              const s = new Date(ev.startsAt);
+              const e = new Date(ev.endsAt);
+              const startM = s.getHours() * 60 + s.getMinutes();
+              const endM = e.getHours() * 60 + e.getMinutes();
+              const winStart = START_HOUR * 60;
+              const winEnd = END_HOUR * 60;
+              return endM > winStart && startM < winEnd;
+            });
 
             return (
               <Box
@@ -302,7 +327,7 @@ export default function Page() {
                   const startMins = start.getHours() * 60 + start.getMinutes();
                   const endMins = end.getHours() * 60 + end.getMinutes();
                   const topMins = startMins - START_HOUR * 60;
-                  const heightMins = endMins - startMins;
+                  const heightMins = Math.max(0, endMins - Math.max(startMins, START_HOUR * 60));
 
                   const top = clamp((topMins / 60) * HOUR_HEIGHT, 0, (END_HOUR - START_HOUR) * HOUR_HEIGHT);
                   const height = Math.max(24, (heightMins / 60) * HOUR_HEIGHT - 4);
@@ -310,7 +335,7 @@ export default function Page() {
                   return (
                     <Tooltip
                       key={ev.id}
-                      title={`${fmtTime(start)} - ${fmtTime(end)} • ${ev.professional}${ev.channel ? " • " + ev.channel : ""}`}
+                      title={`${ev.student?.nome ?? "Aluno"} • ${fmtTime(start)} - ${fmtTime(end)} • ${ev.professional}${ev.channel ? " • " + ev.channel : ""}`}
                       placement="right"
                     >
                       <Box
@@ -337,11 +362,11 @@ export default function Page() {
                         }}
                       >
                         <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                            {fmtTime(start)} – {fmtTime(end)}
+                          <Typography variant="caption" sx={{ fontWeight: 700 }} noWrap>
+                            {ev.student?.nome ?? "Aluno"}
                           </Typography>
                           <Typography variant="caption" noWrap>
-                            {ev.professional}
+                            {fmtTime(start)} – {fmtTime(end)} • {ev.professional}
                           </Typography>
                           <Stack direction="row" spacing={0.5} alignItems="center">
                             <Chip size="small" label={statusLabel[ev.status]} color={statusColor[ev.status]} />
@@ -358,7 +383,7 @@ export default function Page() {
         </Box>
       </Box>
 
-      {/* estados de erro / carregando */}
+      {/* estados */}
       <Box sx={{ mt: 2 }}>
         {loading && !items.length && (
           <Stack direction="row" spacing={1} alignItems="center">
@@ -378,9 +403,20 @@ export default function Page() {
 
       {/* Detalhes do compromisso */}
       <Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Detalhes do agendamento</DialogTitle>
+        <DialogTitle sx={{ pr: 5 }}>
+          Detalhes do agendamento
+          <IconButton
+            size="small"
+            onClick={() => setSelected(null)}
+            sx={{ position: "absolute", right: 8, top: 8 }}
+            aria-label="Fechar"
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={1.2}>
+            <Typography variant="body2"><b>Aluno:</b> {selected?.student?.nome ?? "—"}</Typography>
             <Typography variant="body2"><b>Início:</b> {selected && fmtTime(new Date(selected.startsAt))}</Typography>
             <Typography variant="body2"><b>Término:</b> {selected && fmtTime(new Date(selected.endsAt))}</Typography>
             <Typography variant="body2"><b>Status:</b> {selected && statusLabel[selected.status]}</Typography>
@@ -401,13 +437,7 @@ export default function Page() {
             variant="contained"
             color="success"
             startIcon={<CheckCircleIcon />}
-            disabled={
-              mutating ||
-              !selected ||
-              selected.status === "CONFIRMED" ||
-              selected.status === "DONE" ||
-              selected.status === "CANCELLED"
-            }
+            disabled={!selected || mutating || selected.status === "CONFIRMED" || selected.status === "DONE" || selected.status === "CANCELLED"}
             onClick={() => runAction(confirmAppointment, "Agendamento confirmado.")}
           >
             Confirmar
@@ -417,12 +447,7 @@ export default function Page() {
             variant="contained"
             color="primary"
             startIcon={<TaskAltIcon />}
-            disabled={
-              mutating ||
-              !selected ||
-              selected.status === "DONE" ||
-              selected.status === "CANCELLED"
-            }
+            disabled={!selected || mutating || selected.status === "DONE" || selected.status === "CANCELLED"}
             onClick={() => runAction(doneAppointment, "Atendimento concluído.")}
           >
             Concluir
@@ -432,12 +457,7 @@ export default function Page() {
             variant="outlined"
             color="warning"
             startIcon={<DoDisturbIcon />}
-            disabled={
-              mutating ||
-              !selected ||
-              selected.status === "NO_SHOW" ||
-              selected.status === "CANCELLED"
-            }
+            disabled={!selected || mutating || selected.status === "NO_SHOW" || selected.status === "CANCELLED"}
             onClick={() => runAction(noShowAppointment, "Marcado como falta.")}
           >
             Falta
@@ -447,12 +467,7 @@ export default function Page() {
             variant="outlined"
             color="error"
             startIcon={<CancelIcon />}
-            disabled={
-              mutating ||
-              !selected ||
-              selected.status === "CANCELLED" ||
-              selected.status === "DONE"
-            }
+            disabled={!selected || mutating || selected.status === "CANCELLED" || selected.status === "DONE"}
             onClick={() => runAction(cancelAppointment, "Agendamento cancelado.")}
           >
             Cancelar

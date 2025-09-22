@@ -46,6 +46,7 @@ import {
   updateStudent,
   deleteStudent,
   getScreenings,
+  createAppointment, // 👈 novo
   type Student,
   type StudentCreate,
   type Screening,
@@ -95,6 +96,133 @@ type Row = {
   lastScreening?: Screening;
 };
 
+/* ===================== Util helpers ===================== */
+function toLocalInput(dt: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(
+    dt.getMinutes()
+  )}`;
+}
+function addMinutes(date: Date, minutes: number) {
+  const d = new Date(date);
+  d.setMinutes(d.getMinutes() + minutes);
+  return d;
+}
+
+/* ===================== Diálogo Rápido: Agendar sem triagem ===================== */
+function AgendarSemTriagemDialog({
+  open,
+  student,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  student: Pick<Student, "id" | "nome"> | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [startsAt, setStartsAt] = useState<string>("");
+  const [durationMin, setDurationMin] = useState<number>(50);
+  const [professional, setProfessional] = useState<string>("Psicologia - Plantão");
+  const [channel, setChannel] = useState<string>("presencial");
+  const [note, setNote] = useState<string>("");
+
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const canSave = !!student && startsAt && durationMin > 0 && professional.trim().length > 1;
+
+  useEffect(() => {
+    if (!open) return;
+    const now = new Date();
+    now.setSeconds(0, 0);
+    setStartsAt(toLocalInput(now));
+    setDurationMin(50);
+    setProfessional("Psicologia - Plantão");
+    setChannel("presencial");
+    setNote("");
+    setErr(null);
+  }, [open]);
+
+  async function onSubmit() {
+    if (!student) return;
+    try {
+      setSaving(true);
+      setErr(null);
+      const start = new Date(startsAt);
+      const end = addMinutes(start, durationMin);
+      await createAppointment({
+        startsAt: start.toISOString(),
+        endsAt: end.toISOString(),
+        durationMin,
+        professional,
+        channel,
+        note: note || null,
+        studentId: student.id, // 👈 sem triagem
+      });
+      onSaved();
+      onClose();
+    } catch (e) {
+      setErr((e as Error).message || "Falha ao agendar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Agendar atendimento {student ? `— ${student.nome}` : ""}</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          <TextField
+            label="Início"
+            type="datetime-local"
+            value={startsAt}
+            onChange={(e) => setStartsAt(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            fullWidth
+          />
+          <TextField
+            label="Duração (min)"
+            type="number"
+            value={durationMin}
+            onChange={(e) => setDurationMin(Number(e.target.value || 0))}
+            inputProps={{ min: 10, step: 5 }}
+            fullWidth
+          />
+          <TextField
+            label="Profissional"
+            value={professional}
+            onChange={(e) => setProfessional(e.target.value)}
+            fullWidth
+          />
+          <TextField
+            label="Canal"
+            value={channel}
+            onChange={(e) => setChannel(e.target.value)}
+            placeholder="presencial | online"
+            fullWidth
+          />
+          <TextField
+            label="Observação"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            multiline
+            minRows={2}
+            fullWidth
+          />
+          {err && <Typography color="error">{err}</Typography>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={saving}>Cancelar</Button>
+        <Button onClick={onSubmit} disabled={!canSave || saving} variant="contained">
+          {saving ? "Salvando…" : "Agendar"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 /* ===================== Diálogo Criar/Editar ===================== */
 function StudentDialog({
   open,
@@ -103,6 +231,7 @@ function StudentDialog({
   onClose,
   onSaved,
   onAgendar,
+  onAgendarSemTriagem, // 👈 novo
 }: {
   open: boolean;
   initial?: Partial<Student>;
@@ -110,6 +239,7 @@ function StudentDialog({
   onClose: () => void;
   onSaved: (s: Student) => void;
   onAgendar?: (s: Screening) => void;
+  onAgendarSemTriagem?: (s: Pick<Student, "id" | "nome">) => void; // 👈 novo
 }) {
   const isEdit = !!initial?.id;
   const [form, setForm] = useState<StudentCreate>({
@@ -256,15 +386,28 @@ function StudentDialog({
                         startIcon={<EventIcon />}
                         onClick={() => onAgendar(lastScreening)}
                       >
-                        Agendar
+                        Agendar (pela triagem)
                       </Button>
                     )}
                   </Stack>
                 </>
               ) : (
-                <Typography variant="body2" color="text.secondary">
-                  Sem triagem registrada.
-                </Typography>
+                <>
+                  <Typography variant="body2" color="text.secondary">
+                    Sem triagem registrada.
+                  </Typography>
+                  {isEdit && onAgendarSemTriagem && initial?.id && (
+                    <Button
+                      size="small"
+                      variant="contained"
+                      startIcon={<EventIcon />}
+                      sx={{ mt: 1 }}
+                      onClick={() => onAgendarSemTriagem({ id: initial.id!, nome: form.nome })}
+                    >
+                      Agendar sem triagem
+                    </Button>
+                  )}
+                </>
               )}
             </Stack>
           </Stack>
@@ -307,7 +450,7 @@ function toCSV(rows: Row[]) {
   return [header.join(","), ...body].join("\n");
 }
 function parseCSV(text: string): StudentCreate[] {
-  const sep = text.indexOf(";") > -1 ? ";" : ",";
+  const sep = text.indexOf(";") > -1 ? ";" : ",".toString();
   const lines = text.split(/\r?\n/).filter(Boolean);
   if (!lines.length) return [];
   const headers = lines[0].split(sep).map(h => h.trim().toLowerCase());
@@ -338,7 +481,8 @@ export default function Page() {
   const [rows, setRows] = useState<Row[]>([]);
   const [dialog, setDialog] = useState<{ open: boolean; initial?: Student; last?: Screening | null }>({ open: false });
 
-  const [agendarFor, setAgendarFor] = useState<Screening | null>(null);
+  const [agendarFor, setAgendarFor] = useState<Screening | null>(null); // via triagem
+  const [quickStudent, setQuickStudent] = useState<Pick<Student,"id"|"nome"> | null>(null); // 👈 sem triagem
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -509,10 +653,11 @@ export default function Page() {
     {
       field: "acoes",
       headerName: "Ações",
-      width: 240,
+      width: 280,
       renderCell: (p: GridRenderCellParams<Row>) => {
         const r = p.row;
-        const canSchedule = !!r.lastScreening;
+        const canScheduleWithScreening = !!r.lastScreening;
+
         if (r.origem === "TRIAGEM") {
           return (
             <Stack direction="row" spacing={1}>
@@ -523,12 +668,12 @@ export default function Page() {
                   </IconButton>
                 </span>
               </Tooltip>
-              <Tooltip title={canSchedule ? "Agendar (usa última triagem)" : "Requer triagem"}>
+              <Tooltip title={canScheduleWithScreening ? "Agendar (usa última triagem)" : "Requer triagem"}>
                 <span>
                   <IconButton
                     color="secondary"
-                    disabled={!canSchedule}
-                    onClick={() => canSchedule && setAgendarFor(r.lastScreening!)}
+                    disabled={!canScheduleWithScreening}
+                    onClick={() => canScheduleWithScreening && setAgendarFor(r.lastScreening!)}
                   >
                     <EventIcon />
                   </IconButton>
@@ -537,6 +682,8 @@ export default function Page() {
             </Stack>
           );
         }
+
+        // CADASTRO
         return (
           <Stack direction="row" spacing={1}>
             <Tooltip title="Editar / Ver triagem / Agendar">
@@ -562,18 +709,20 @@ export default function Page() {
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title={canSchedule ? "Agendar (usa última triagem)" : "Sem triagem para agendar"}>
+
+            {/* Agendar SEM triagem — sempre habilitado para cadastro */}
+            <Tooltip title="Agendar sem triagem">
               <span>
                 <IconButton
                   size="small"
                   color="secondary"
-                  disabled={!canSchedule}
-                  onClick={() => canSchedule && setAgendarFor(r.lastScreening!)}
+                  onClick={() => setQuickStudent({ id: r.id, nome: r.nome })}
                 >
                   <EventIcon fontSize="small" />
                 </IconButton>
               </span>
             </Tooltip>
+
             <Tooltip title="Excluir">
               <IconButton size="small" color="error" onClick={() => excluirAluno(r)}>
                 <DeleteIcon fontSize="small" />
@@ -694,9 +843,10 @@ export default function Page() {
         onClose={() => setDialog({ open: false })}
         onSaved={() => load()}
         onAgendar={(s) => setAgendarFor(s)}
+        onAgendarSemTriagem={(s) => setQuickStudent(s)} // 👈 novo
       />
 
-      {/* Agendar a partir da triagem (abertura direta pela coluna Ações) */}
+      {/* Agendar a partir da triagem (coluna Ações) */}
       <AgendarDialog
         open={!!agendarFor}
         screening={agendarFor}
@@ -705,6 +855,14 @@ export default function Page() {
           setAgendarFor(null);
           load();
         }}
+      />
+
+      {/* Agendar sem triagem (novo) */}
+      <AgendarSemTriagemDialog
+        open={!!quickStudent}
+        student={quickStudent}
+        onClose={() => setQuickStudent(null)}
+        onSaved={() => load()}
       />
     </Box>
   );
