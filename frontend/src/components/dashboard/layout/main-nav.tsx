@@ -1,88 +1,122 @@
 'use client';
 
 import * as React from 'react';
-import Avatar from '@mui/material/Avatar';
-import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
+import Avatar from '@mui/material/Avatar';
+import InputBase from '@mui/material/InputBase';
 import Tooltip from '@mui/material/Tooltip';
-import { BellIcon } from '@phosphor-icons/react/dist/ssr/Bell';
-import { ListIcon } from '@phosphor-icons/react/dist/ssr/List';
-import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/ssr/MagnifyingGlass';
-import { UsersIcon } from '@phosphor-icons/react/dist/ssr/Users';
 
-import { usePopover } from '@/hooks/use-popover';
+import { List as ListIcon } from '@phosphor-icons/react/dist/ssr/List';
+import { Bell as BellIcon } from '@phosphor-icons/react/dist/ssr/Bell';
 
 import { MobileNav } from './mobile-nav';
 import { UserPopover } from './user-popover';
 
 export function MainNav(): React.JSX.Element {
-  const [openNav, setOpenNav] = React.useState<boolean>(false);
+  const [openNav, setOpenNav] = React.useState(false);
+  const [userMenuEl, setUserMenuEl] = React.useState<HTMLElement | null>(null);
+  const [avatarSrc, setAvatarSrc] = React.useState<string | undefined>('/assets/avatar.png');
 
-  const userPopover = usePopover<HTMLDivElement>();
+  const handleUserOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setUserMenuEl(event.currentTarget);
+  };
+  const handleUserClose = () => {
+    setUserMenuEl(null);
+  };
 
   return (
-    <React.Fragment>
+    <>
       <Box
-        component="header"
         sx={{
-          borderBottom: '1px solid var(--mui-palette-divider)',
-          backgroundColor: 'var(--mui-palette-background-paper)',
           position: 'sticky',
           top: 0,
-          zIndex: 'var(--mui-zIndex-appBar)',
+          zIndex: 1100,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          px: 2,
+          py: 1,
+          bgcolor: 'background.paper',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
         }}
       >
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{ alignItems: 'center', justifyContent: 'space-between', minHeight: '64px', px: 2 }}
+        {/* Botão 3 risquinhos */}
+        <IconButton
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              const isDesktop = window.matchMedia('(min-width: 1200px)').matches; // lg
+              if (isDesktop) {
+                window.dispatchEvent(new CustomEvent('psico-toggle-sidenav-hidden'));
+              } else {
+                setOpenNav(true); // no mobile abre o Drawer
+              }
+            }
+          }}
+          sx={{
+            border: '2px solid',
+            borderColor: 'primary.light',
+            borderRadius: 2,
+            width: 44,
+            height: 36,
+            '&:hover': { backgroundColor: 'action.hover' },
+          }}
+          aria-label="Abrir/fechar menu"
         >
-          <Stack sx={{ alignItems: 'center' }} direction="row" spacing={2}>
-            <IconButton
-              onClick={(): void => {
-                setOpenNav(true);
-              }}
-              sx={{ display: { lg: 'none' } }}
-            >
-              <ListIcon />
+          <ListIcon size={20} weight="bold" />
+        </IconButton>
+
+        {/* Busca pequena */}
+        <Box
+          sx={{
+            flex: { xs: 1, sm: '0 0 auto' },
+            width: { xs: 'auto', sm: 220 }, // 100% no mobile, 220px no desktop
+            display: 'flex',
+            alignItems: 'center',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 2,
+            px: 1.5,
+            height: 36,
+          }}
+        >
+          <InputBase placeholder="Buscar..." sx={{ width: '100%' }} />
+        </Box>
+
+        {/* Ações à direita */}
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 'auto' }}>
+          <Tooltip title="Notificações">
+            <IconButton aria-label="Notificações">
+              <BellIcon size={20} />
             </IconButton>
-            <Tooltip title="Search">
-              <IconButton>
-                <MagnifyingGlassIcon />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-          <Stack sx={{ alignItems: 'center' }} direction="row" spacing={2}>
-            <Tooltip title="Contacts">
-              <IconButton>
-                <UsersIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Notifications">
-              <Badge badgeContent={4} color="success" variant="dot">
-                <IconButton>
-                  <BellIcon />
-                </IconButton>
-              </Badge>
-            </Tooltip>
+          </Tooltip>
+
+          <IconButton onClick={handleUserOpen} aria-label="Abrir menu do usuário" sx={{ p: 0 }}>
             <Avatar
-              onClick={userPopover.handleOpen}
-              ref={userPopover.anchorRef}
-              src="/assets/avatar.png"
-              sx={{ cursor: 'pointer' }}
-            />
-          </Stack>
+              src={avatarSrc}
+              alt="Minha conta"
+              onError={() => setAvatarSrc(undefined)} // fallback para letra se a imagem falhar
+              sx={{
+                width: 32,
+                height: 32,
+                cursor: 'pointer',
+                border: '2px solid',
+                borderColor: 'divider',
+              }}
+            >
+              U
+            </Avatar>
+          </IconButton>
         </Stack>
       </Box>
-      <UserPopover anchorEl={userPopover.anchorRef.current} onClose={userPopover.handleClose} open={userPopover.open} />
-      <MobileNav
-        onClose={() => {
-          setOpenNav(false);
-        }}
-        open={openNav}
-      />
-    </React.Fragment>
+
+      {/* Drawer mobile */}
+      <MobileNav open={openNav} onClose={() => setOpenNav(false)} />
+
+      {/* Popover usuário */}
+      <UserPopover anchorEl={userMenuEl} onClose={handleUserClose} open={Boolean(userMenuEl)} />
+    </>
   );
 }

@@ -19,6 +19,9 @@
   --icon-fontSize-md: 1.25rem;
   --icon-fontSize-lg: 1.5rem;
 }
+:root {
+  --SideNav-width-current: 260px;
+}
 
 *:focus-visible {
   outline: 2px solid var(--mui-palette-primary-main);

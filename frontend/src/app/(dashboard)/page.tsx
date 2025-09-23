@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import { Box, Container, Unstable_Grid2 as Grid } from '@mui/material';
-import { Layout as DashboardLayout } from 'src/layouts/dashboard/layout';
+import { Layout as DashboardLayout } from 'src/app/dashboard/layout';
 import { KpiCard } from 'src/components/dashboard/KpiCard';
 import { LineSessionsChart } from 'src/components/dashboard/LineSessionsChart';
 import { SeverityBars } from 'src/components/dashboard/SeverityBars';
