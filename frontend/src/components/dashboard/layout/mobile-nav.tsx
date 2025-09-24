@@ -59,31 +59,46 @@ export function MobileNav({ open, onClose }: MobileNavProps): React.JSX.Element 
       onClose={onClose}
       open={open}
     >
-      <Box sx={{ px: 2, pt: 2, pb: 1 }}>
-        <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-         <Image 
-           src="/logo-ifam.png" 
-           alt="IFAM" 
-           width={24} 
-           height={30}
-           style={{ 
-             objectFit: "contain",
-             flexShrink: 0
-           }}
-         />
-          <Typography 
-            variant="h6" 
-            sx={{ 
-              fontWeight: 600,
-              fontSize: "1rem",
-              letterSpacing: "-0.01em"
-            }}
-            color="var(--mui-palette-neutral-100)"
-          >
-            Psicoflow
-          </Typography>
-        </Link>
-      </Box>
+  <Box
+  sx={{
+    px: 2,
+    height: 64,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-start'
+  }}
+>
+  <Link href="/" style={{ textDecoration: 'none' }}>
+    <Stack direction="row" alignItems="center" spacing={1.25}>
+          <Image
+        src="/logo-ifam.png"       // seu símbolo
+        alt="Psicoflow"
+        width={36}
+        height={36}
+        priority
+        style={{
+          display: 'block',
+          objectFit: 'contain',
+          objectPosition: 'center'
+        }}
+      />
+
+      <Typography
+        variant="h6"
+        sx={{
+          fontWeight: 700,
+          fontSize: '1.05rem',
+          lineHeight: 1,          // ⬅️ evita “descer” pela linha-base
+          letterSpacing: '-0.01em',
+          color: '#E0E0E0'
+        }}
+      >
+        Psicoflow
+      </Typography>
+    </Stack>
+  </Link>
+</Box>
+
       <Divider sx={{ borderColor: 'var(--mui-palette-neutral-700)', mb: 1 }} />
       <Box component="nav" sx={{ flex: '1 1 auto', p: '12px 0 0 0' }}>
         {renderNavItems({ pathname, items: navItems })}
