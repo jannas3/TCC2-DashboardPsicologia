@@ -6,21 +6,46 @@ const router = Router();
 type Status = "PENDING" | "CONFIRMED" | "DONE" | "NO_SHOW" | "CANCELLED";
 
 // Janela de atendimento: 14h–18h
+// topo do arquivo
 const BUSINESS_START_HOUR = 14;
 const BUSINESS_END_HOUR = 18;
+
+// defina o timezone "oficial" do atendimento via env, com default
+const BUSINESS_TZ = process.env.BUSINESS_TZ || "America/Manaus";
+
+// util: extrai HH:mm *da perspectiva do timezone desejado*
+function getHMInTZ(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  }).formatToParts(date);
+  const hh = Number(parts.find(p => p.type === "hour")?.value ?? "0");
+  const mm = Number(parts.find(p => p.type === "minute")?.value ?? "0");
+  return { hh, mm };
+}
 
 function validateBusinessHours(start: Date, end: Date): string | null {
   if (isNaN(+start) || isNaN(+end)) return "Datas inválidas.";
   if (start >= end) return "Início deve ser antes do término.";
-  const startMinutes = start.getHours() * 60 + start.getMinutes();
-  const endMinutes = end.getHours() * 60 + end.getMinutes();
+
+  // 👇 pega hora/minuto no timezone de negócio
+  const { hh: sh, mm: sm } = getHMInTZ(start, BUSINESS_TZ);
+  const { hh: eh, mm: em } = getHMInTZ(end, BUSINESS_TZ);
+
+  const startMinutes = sh * 60 + sm;
+  const endMinutes = eh * 60 + em;
+
   const min = BUSINESS_START_HOUR * 60;
-  const max = BUSINESS_END_HOUR * 60;
+  const max = BUSINESS_END_HOUR * 60; // exclusivo
+
   if (startMinutes < min || endMinutes > max) {
-    return `Atendimentos somente entre ${String(BUSINESS_START_HOUR).padStart(2, "0")}:00 e ${String(BUSINESS_END_HOUR).padStart(2, "0")}:00.`;
+    return `Atendimentos somente entre ${String(BUSINESS_START_HOUR).padStart(2, "0")}:00 e ${String(BUSINESS_END_HOUR).padStart(2, "0")}:00 (${BUSINESS_TZ}).`;
   }
   return null;
 }
+
 
 // checagem de sobreposição de horários
 function overlapWhere(start: Date, end: Date, professional: string) {

@@ -73,8 +73,8 @@ export function MobileNav({ open, onClose }: MobileNavProps): React.JSX.Element 
           <Image
         src="/logo-ifam.png"       // seu símbolo
         alt="Psicoflow"
-        width={36}
-        height={36}
+        width={30}
+        height={30}
         priority
         style={{
           display: 'block',

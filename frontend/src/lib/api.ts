@@ -6,19 +6,41 @@ export const BASE_URL =
   (typeof window === "undefined" ? "http://backend:4000" : "http://localhost:4000");
 
 // ----- helpers de fetch -----
+// ----- helpers de fetch -----
 async function parseJsonOrText(res: Response) {
   const ct = res.headers.get("content-type") || "";
-  if (ct.includes("application/json")) return res.json();
-  return res.text();
+  if (ct.includes("application/json")) {
+    try { return await res.json(); } catch { /* fallback abaixo */ }
+  }
+  try { return await res.text(); } catch { return ""; }
 }
+
+function formatErrorBody(body: any): string {
+  if (!body) return "";
+  if (typeof body === "string") return body;
+  if (body.message) return String(body.message);
+  if (body.error) return String(body.error);
+  if (body.errors && typeof body.errors === "object") {
+    // junta { campo: ["msg1","msg2"] } -> "campo: msg1; msg2 | outro: msg"
+    return Object.entries(body.errors)
+      .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join("; ") : String(v)}`)
+      .join(" | ");
+  }
+  try { return JSON.stringify(body); } catch { return String(body); }
+}
+
 async function okOrThrow<T = any>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await parseJsonOrText(res);
-    const msg = typeof body === "string" ? body : JSON.stringify(body);
-    throw new Error(msg || res.statusText);
+    const detail = formatErrorBody(body) || res.statusText;
+    const err: any = new Error(detail);
+    err.status = res.status;
+    err.body = body;         // mantém estrutura p/ debug se quiser
+    throw err;
   }
   return (await parseJsonOrText(res)) as T;
 }
+
 
 // ===================== Tipos compartilhados =====================
 export type RiskLevel = "MINIMO"|"LEVE"|"MODERADO"|"MODERADAMENTE_GRAVE"|"GRAVE";
