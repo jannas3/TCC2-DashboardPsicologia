@@ -58,7 +58,7 @@ export default function AtendimentoPage() {
   const [day, setDay] = useState<Date>(() => startOfDay(new Date()));
   const [items, setItems] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<"CONFIRMED" | "DONE" | "__ALL__">("CONFIRMED");
+const [statusFilter, setStatusFilter] = useState<"CONFIRMED" | "DONE" | "__ALL__">("__ALL__");
 
   const [open, setOpen] = useState<Appointment | null>(null);
   const [note, setNote] = useState<SessionNote | null>(null);
@@ -277,9 +277,15 @@ export default function AtendimentoPage() {
           <Button startIcon={<SaveIcon />} variant="outlined" onClick={() => saveNote(false)} disabled={saving}>
             Salvar
           </Button>
-          <Button startIcon={<TaskAltIcon />} variant="contained" onClick={() => saveNote(true)} disabled={saving}>
-            Salvar & Concluir
+          <Button
+            startIcon={<TaskAltIcon />}
+            variant="contained"
+            onClick={() => saveNote(true)}
+            disabled={saving}
+          >
+            Salvar e concluir
           </Button>
+
         </DialogActions>
       </Dialog>
     </Box>
