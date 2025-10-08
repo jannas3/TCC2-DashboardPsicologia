@@ -41,7 +41,11 @@ async function okOrThrow<T = any>(res: Response): Promise<T> {
   return (await parseJsonOrText(res)) as T;
 }
 
-
+export function authHeaders(): HeadersInit {
+  if (typeof window === 'undefined') return {};
+  const t = localStorage.getItem('custom-auth-token');
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
 // ===================== Tipos compartilhados =====================
 export type RiskLevel = "MINIMO"|"LEVE"|"MODERADO"|"MODERADAMENTE_GRAVE"|"GRAVE";
 

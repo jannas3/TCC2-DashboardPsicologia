@@ -8,13 +8,13 @@ import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import FormControl from '@mui/material/FormControl';
 import FormHelperText from '@mui/material/FormHelperText';
+import InputAdornment from '@mui/material/InputAdornment';
 import InputLabel from '@mui/material/InputLabel';
 import Link from '@mui/material/Link';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { EyeIcon } from '@phosphor-icons/react/dist/ssr/Eye';
-import { EyeSlashIcon } from '@phosphor-icons/react/dist/ssr/EyeSlash';
+import { EnvelopeSimple, Lock, Eye, EyeSlash } from '@phosphor-icons/react';
 import { Controller, useForm } from 'react-hook-form';
 import { z as zod } from 'zod';
 
@@ -23,63 +23,43 @@ import { authClient } from '@/lib/auth/client';
 import { useUser } from '@/hooks/use-user';
 
 const schema = zod.object({
-  email: zod.string().min(1, { message: 'Email is required' }).email(),
-  password: zod.string().min(1, { message: 'Password is required' }),
+  email: zod.string().min(1, { message: 'Informe seu email profissional' }).email(),
+  password: zod.string().min(1, { message: 'Informe sua senha' })
 });
-
 type Values = zod.infer<typeof schema>;
-
-const defaultValues = { email: 'sofia@devias.io', password: 'Secret1' } satisfies Values;
+const defaultValues: Values = { email: '', password: '' };
 
 export function SignInForm(): React.JSX.Element {
   const router = useRouter();
-
   const { checkSession } = useUser();
 
-  const [showPassword, setShowPassword] = React.useState<boolean>();
-
-  const [isPending, setIsPending] = React.useState<boolean>(false);
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [isPending, setIsPending] = React.useState(false);
 
   const {
     control,
     handleSubmit,
     setError,
-    formState: { errors },
+    formState: { errors }
   } = useForm<Values>({ defaultValues, resolver: zodResolver(schema) });
 
   const onSubmit = React.useCallback(
     async (values: Values): Promise<void> => {
       setIsPending(true);
-
       const { error } = await authClient.signInWithPassword(values);
-
       if (error) {
         setError('root', { type: 'server', message: error });
         setIsPending(false);
         return;
       }
-
-      // Refresh the auth state
       await checkSession?.();
-
-      // UserProvider, for this case, will not refresh the router
-      // After refresh, GuestGuard will handle the redirect
       router.refresh();
     },
     [checkSession, router, setError]
   );
 
   return (
-    <Stack spacing={4}>
-      <Stack spacing={1}>
-        <Typography variant="h4">Sign in</Typography>
-        <Typography color="text.secondary" variant="body2">
-          Don&apos;t have an account?{' '}
-          <Link component={RouterLink} href={paths.auth.signUp} underline="hover" variant="subtitle2">
-            Sign up
-          </Link>
-        </Typography>
-      </Stack>
+    <Stack spacing={2}>
       <form onSubmit={handleSubmit(onSubmit)}>
         <Stack spacing={2}>
           <Controller
@@ -87,67 +67,78 @@ export function SignInForm(): React.JSX.Element {
             name="email"
             render={({ field }) => (
               <FormControl error={Boolean(errors.email)}>
-                <InputLabel>Email address</InputLabel>
-                <OutlinedInput {...field} label="Email address" type="email" />
+                <InputLabel>Email Profissional</InputLabel>
+                <OutlinedInput
+                  {...field}
+                  label="Email Profissional"
+                  type="email"
+                  placeholder="seu@email.com"
+                  startAdornment={
+                    <InputAdornment position="start">
+                      <EnvelopeSimple size={20} />
+                    </InputAdornment>
+                  }
+                />
                 {errors.email ? <FormHelperText>{errors.email.message}</FormHelperText> : null}
               </FormControl>
             )}
           />
+
           <Controller
             control={control}
             name="password"
             render={({ field }) => (
               <FormControl error={Boolean(errors.password)}>
-                <InputLabel>Password</InputLabel>
+                <InputLabel>Senha</InputLabel>
                 <OutlinedInput
                   {...field}
-                  endAdornment={
-                    showPassword ? (
-                      <EyeIcon
-                        cursor="pointer"
-                        fontSize="var(--icon-fontSize-md)"
-                        onClick={(): void => {
-                          setShowPassword(false);
-                        }}
-                      />
-                    ) : (
-                      <EyeSlashIcon
-                        cursor="pointer"
-                        fontSize="var(--icon-fontSize-md)"
-                        onClick={(): void => {
-                          setShowPassword(true);
-                        }}
-                      />
-                    )
-                  }
-                  label="Password"
+                  label="Senha"
                   type={showPassword ? 'text' : 'password'}
+                  placeholder="Digite sua senha"
+                  startAdornment={
+                    <InputAdornment position="start">
+                      <Lock size={20} />
+                    </InputAdornment>
+                  }
+                  endAdornment={
+                    <InputAdornment position="end">
+                      {showPassword ? (
+                        <Eye
+                          size={20}
+                          cursor="pointer"
+                          onClick={() => setShowPassword(false)}
+                          aria-label="Ocultar senha"
+                        />
+                      ) : (
+                        <EyeSlash
+                          size={20}
+                          cursor="pointer"
+                          onClick={() => setShowPassword(true)}
+                          aria-label="Mostrar senha"
+                        />
+                      )}
+                    </InputAdornment>
+                  }
                 />
                 {errors.password ? <FormHelperText>{errors.password.message}</FormHelperText> : null}
               </FormControl>
             )}
           />
-          <div>
+
+          <Stack direction="row" justifyContent="flex-end">
             <Link component={RouterLink} href={paths.auth.resetPassword} variant="subtitle2">
-              Forgot password?
+              Esqueceu sua senha?
             </Link>
-          </div>
+          </Stack>
+
+          {/* erro de autenticação */}
           {errors.root ? <Alert color="error">{errors.root.message}</Alert> : null}
-          <Button disabled={isPending} type="submit" variant="contained">
-            Sign in
+
+          <Button disabled={isPending} type="submit" variant="contained" size="large">
+            Acessar Plataforma
           </Button>
         </Stack>
       </form>
-      <Alert color="warning">
-        Use{' '}
-        <Typography component="span" sx={{ fontWeight: 700 }} variant="inherit">
-          sofia@devias.io
-        </Typography>{' '}
-        with password{' '}
-        <Typography component="span" sx={{ fontWeight: 700 }} variant="inherit">
-          Secret1
-        </Typography>
-      </Alert>
     </Stack>
   );
 }

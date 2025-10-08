@@ -1,96 +1,92 @@
 'use client';
 
 import type { User } from '@/types/user';
+import { BASE_URL } from '@/lib/api';
 
-function generateToken(): string {
-  const arr = new Uint8Array(12);
-  globalThis.crypto.getRandomValues(arr);
-  return Array.from(arr, (v) => v.toString(16).padStart(2, '0')).join('');
-}
+const TOKEN_KEY = 'custom-auth-token';
 
-const user = {
-  id: 'USR-000',
-  avatar: '/assets/avatar.png',
-  firstName: 'Sofia',
-  lastName: 'Rivers',
-  email: 'sofia@devias.io',
-} satisfies User;
+export interface SignUpParams { firstName: string; lastName: string; email: string; password: string; }
+export interface SignInWithPasswordParams { email: string; password: string; }
+export interface SignInWithOAuthParams { provider: 'google' | 'discord'; }
+export interface ResetPasswordParams { email: string; }
 
-export interface SignUpParams {
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-}
+type BackendAuth = { user: { id: string; email: string; name?: string; role: string }, token: string };
+type BackendMe = { id: string; email: string; name?: string; role: string };
 
-export interface SignInWithOAuthParams {
-  provider: 'google' | 'discord';
-}
+function saveToken(t: string) { if (typeof window !== 'undefined') localStorage.setItem(TOKEN_KEY, t); }
+function readToken() { return typeof window === 'undefined' ? null : localStorage.getItem(TOKEN_KEY); }
+function clearToken() { if (typeof window !== 'undefined') localStorage.removeItem(TOKEN_KEY); }
 
-export interface SignInWithPasswordParams {
-  email: string;
-  password: string;
-}
-
-export interface ResetPasswordParams {
-  email: string;
+function toUser(me: BackendMe): User {
+  const base = (me.name ?? '').trim();
+  const [firstName, ...rest] = (base || me.email.split('@')[0]).split(' ');
+  return {
+    id: me.id,
+    email: me.email,
+    avatar: '/assets/avatar.png',
+    firstName: firstName || 'Profissional',
+    lastName: rest.join(' '),
+  };
 }
 
 class AuthClient {
-  async signUp(_: SignUpParams): Promise<{ error?: string }> {
-    // Make API request
-
-    // We do not handle the API, so we'll just generate a token and store it in localStorage.
-    const token = generateToken();
-    localStorage.setItem('custom-auth-token', token);
-
-    return {};
+  async signUp({ firstName, lastName, email, password }: SignUpParams): Promise<{ error?: string }> {
+    try {
+      const res = await fetch(`${BASE_URL}/api/auth/sign-up`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name: `${firstName} ${lastName}`.trim() }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return { error: body?.message || 'Falha ao criar conta' };
+      }
+      const data: BackendAuth = await res.json();
+      saveToken(data.token);
+      return {};
+    } catch (e: any) { return { error: e?.message || 'Erro de rede' }; }
   }
 
   async signInWithOAuth(_: SignInWithOAuthParams): Promise<{ error?: string }> {
-    return { error: 'Social authentication not implemented' };
+    return { error: 'Social auth não implementado' };
   }
 
-  async signInWithPassword(params: SignInWithPasswordParams): Promise<{ error?: string }> {
-    const { email, password } = params;
-
-    // Make API request
-
-    // We do not handle the API, so we'll check if the credentials match with the hardcoded ones.
-    if (email !== 'sofia@devias.io' || password !== 'Secret1') {
-      return { error: 'Invalid credentials' };
-    }
-
-    const token = generateToken();
-    localStorage.setItem('custom-auth-token', token);
-
-    return {};
+  async signInWithPassword({ email, password }: SignInWithPasswordParams): Promise<{ error?: string }> {
+    try {
+      const res = await fetch(`${BASE_URL}/api/auth/sign-in`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return { error: body?.message || 'Credenciais inválidas' };
+      }
+      const data: BackendAuth = await res.json();
+      saveToken(data.token);
+      return {};
+    } catch (e: any) { return { error: e?.message || 'Erro de rede' }; }
   }
 
   async resetPassword(_: ResetPasswordParams): Promise<{ error?: string }> {
-    return { error: 'Password reset not implemented' };
-  }
-
-  async updatePassword(_: ResetPasswordParams): Promise<{ error?: string }> {
-    return { error: 'Update reset not implemented' };
+    return { error: 'Recuperação de senha não implementada no backend' };
   }
 
   async getUser(): Promise<{ data?: User | null; error?: string }> {
-    // Make API request
-
-    // We do not handle the API, so just check if we have a token in localStorage.
-    const token = localStorage.getItem('custom-auth-token');
-
-    if (!token) {
-      return { data: null };
-    }
-
-    return { data: user };
+    const token = readToken();
+    if (!token) return { data: null };
+    try {
+      const res = await fetch(`${BASE_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return { data: null };
+      const me: BackendMe = await res.json();
+      return { data: toUser(me) };
+    } catch { return { data: null }; }
   }
 
   async signOut(): Promise<{ error?: string }> {
-    localStorage.removeItem('custom-auth-token');
-
+    clearToken();
     return {};
   }
 }
