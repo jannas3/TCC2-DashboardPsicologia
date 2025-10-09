@@ -96,7 +96,7 @@ export function SideNav(): React.JSX.Element {
         <Link href="/" style={{ textDecoration: 'none' }}>
           <Stack direction="row" alignItems="center" spacing={1.25}>
             <Image
-        src="/logo-ifam.png"       // seu símbolo
+        src="/logo-ifam1.png"       // seu símbolo
         alt="Psicoflow"
         width={30}
         height={30}

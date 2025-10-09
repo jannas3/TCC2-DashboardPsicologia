@@ -10,8 +10,8 @@ export interface SignInWithPasswordParams { email: string; password: string; }
 export interface SignInWithOAuthParams { provider: 'google' | 'discord'; }
 export interface ResetPasswordParams { email: string; }
 
-type BackendAuth = { user: { id: string; email: string; name?: string; role: string }, token: string };
-type BackendMe = { id: string; email: string; name?: string; role: string };
+type BackendAuth = { user: { id: string; email: string; name?: string; role: string; avatarUrl?: string }, token: string };
+type BackendMe = { id: string; email: string; name?: string; role: string; avatarUrl?: string };
 
 function saveToken(t: string) { if (typeof window !== 'undefined') localStorage.setItem(TOKEN_KEY, t); }
 function readToken() { return typeof window === 'undefined' ? null : localStorage.getItem(TOKEN_KEY); }
@@ -23,7 +23,7 @@ function toUser(me: BackendMe): User {
   return {
     id: me.id,
     email: me.email,
-    avatar: '/assets/avatar.png',
+    avatar: me.avatarUrl || '/assets/avatar.png',
     firstName: firstName || 'Profissional',
     lastName: rest.join(' '),
   };
@@ -77,7 +77,12 @@ class AuthClient {
     if (!token) return { data: null };
     try {
       const res = await fetch(`${BASE_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store'
       });
       if (!res.ok) return { data: null };
       const me: BackendMe = await res.json();

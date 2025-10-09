@@ -13,18 +13,55 @@ import { Bell as BellIcon } from '@phosphor-icons/react/dist/ssr/Bell';
 
 import { MobileNav } from './mobile-nav';
 import { UserPopover } from './user-popover';
+import { useUser } from '@/hooks/use-user';
+
+const DEFAULT_AVATAR = '/assets/avatar.png';
+
+type UIUser = {
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  avatar?: string | null;
+};
+
+// helper pra não duplicar ?t=...
+function withCacheBuster(url?: string | null, seed?: number) {
+  if (!url) return undefined;
+  const hasQuery = url.includes('?');
+  const param = `t=${seed ?? Date.now()}`;
+  return `${url}${hasQuery ? '&' : '?'}${param}`;
+}
 
 export function MainNav(): React.JSX.Element {
   const [openNav, setOpenNav] = React.useState(false);
   const [userMenuEl, setUserMenuEl] = React.useState<HTMLElement | null>(null);
-  const [avatarSrc, setAvatarSrc] = React.useState<string | undefined>('/assets/avatar.png');
 
-  const handleUserOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setUserMenuEl(event.currentTarget);
-  };
-  const handleUserClose = () => {
-    setUserMenuEl(null);
-  };
+  // tipagem local do hook
+  const { user } = useUser() as { user: UIUser | null };
+
+  // nome exibido e inicial seguros (sem indexing em tipo desconhecido)
+  const displayName: string =
+    [user?.firstName ?? '', user?.lastName ?? ''].join(' ').trim() ||
+    (user?.email ? user.email.split('@')[0] : 'Usuário');
+
+  const initial: string = displayName.length ? displayName.charAt(0).toUpperCase() : 'U';
+
+  // cache-buster para quando o avatar mudar após upload
+  const [avatarSeed, setAvatarSeed] = React.useState<number>(0);
+  React.useEffect(() => {
+    setAvatarSeed(Date.now());
+  }, [user?.avatar]);
+
+  const [avatarSrc, setAvatarSrc] = React.useState<string | undefined>(undefined);
+  React.useEffect(() => {
+    const src = user?.avatar || DEFAULT_AVATAR;
+    setAvatarSrc(withCacheBuster(src, avatarSeed));
+  }, [user?.avatar, avatarSeed]);
+
+  const handleAvatarError = () => setAvatarSrc(withCacheBuster(DEFAULT_AVATAR));
+
+  const handleUserOpen = (event: React.MouseEvent<HTMLElement>) => setUserMenuEl(event.currentTarget);
+  const handleUserClose = () => setUserMenuEl(null);
 
   return (
     <>
@@ -72,7 +109,7 @@ export function MainNav(): React.JSX.Element {
         <Box
           sx={{
             flex: { xs: 1, sm: '0 0 auto' },
-            width: { xs: 'auto', sm: 220 }, // 100% no mobile, 220px no desktop
+            width: { xs: 'auto', sm: 220 },
             display: 'flex',
             alignItems: 'center',
             border: '1px solid',
@@ -96,8 +133,8 @@ export function MainNav(): React.JSX.Element {
           <IconButton onClick={handleUserOpen} aria-label="Abrir menu do usuário" sx={{ p: 0 }}>
             <Avatar
               src={avatarSrc}
-              alt="Minha conta"
-              onError={() => setAvatarSrc(undefined)} // fallback para letra se a imagem falhar
+              alt={displayName}
+              onError={handleAvatarError}
               sx={{
                 width: 32,
                 height: 32,
@@ -106,7 +143,7 @@ export function MainNav(): React.JSX.Element {
                 borderColor: 'divider',
               }}
             >
-              U
+              {initial}
             </Avatar>
           </IconButton>
         </Stack>

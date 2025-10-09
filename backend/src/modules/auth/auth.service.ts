@@ -19,8 +19,14 @@ export const authService = {
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: { email, passwordHash, name },
-      select: { id: true, email: true, name: true, role: true, createdAt: true }
+      select: { id: true, email: true, name: true, role: true, avatarUrl: true, createdAt: true }
     });
+    
+    // Se tem avatarUrl, converte para URL completa
+    if (user.avatarUrl) {
+      user.avatarUrl = `${process.env.API_BASE_URL || 'http://localhost:4000'}${user.avatarUrl}`;
+    }
+    
     const token = signToken(user.id, user.email, user.role);
     return { user, token };
   },
@@ -37,6 +43,7 @@ export const authService = {
       email: user.email,
       name: user.name,
       role: user.role,
+      avatarUrl: user.avatarUrl ? `${process.env.API_BASE_URL || 'http://localhost:4000'}${user.avatarUrl}` : user.avatarUrl,
       createdAt: user.createdAt
     };
     const token = signToken(user.id, user.email, user.role);
@@ -46,8 +53,15 @@ export const authService = {
   async getMe(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, role: true, createdAt: true }
+      select: { id: true, email: true, name: true, role: true, avatarUrl: true, createdAt: true }
     });
+    
+    // Se tem avatarUrl, converte para URL completa
+    if (user?.avatarUrl) {
+      const baseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+      user.avatarUrl = `${baseUrl}${user.avatarUrl}`;
+    }
+    
     return user;
   }
 };

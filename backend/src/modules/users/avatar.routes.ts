@@ -47,7 +47,9 @@ router.post('/me/avatar', requireAuth, upload.single('avatar'), async (req: Auth
     data: { avatarUrl }
   });
 
-  res.json({ avatarUrl });
+  // Retorna a URL completa para o frontend
+  const fullAvatarUrl = `${req.protocol}://${req.get('host')}${avatarUrl}`;
+  res.json({ avatarUrl: fullAvatarUrl });
 });
 
 export default router;
