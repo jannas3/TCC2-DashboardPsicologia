@@ -24,7 +24,7 @@ export function Logo({ color = 'dark', emblem, height = HEIGHT, width = WIDTH }:
   if (emblem) {
     url = color === 'light' ? '/assets/logo-ifam.png' : '/assets/logo-ifam.png';
   } else {
-    url = color === 'light' ? '/assets/logo-ifam.png' : '/assets/logo-ifam.png';
+    url = color === 'light' ? '/assets/logo-ifam1.png' : '/assets/logo-ifam1.png';
   }
 
   return <Box alt="logo" component="img" height={height} src={url} width={width} />;

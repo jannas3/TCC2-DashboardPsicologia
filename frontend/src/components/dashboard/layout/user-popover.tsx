@@ -29,7 +29,7 @@ type UIUser = {
   avatar?: string | null;
 };
 
-const DEFAULT_AVATAR = '/assets/avatar.png';
+const DEFAULT_AVATAR = '';
 const withCacheBuster = (url?: string | null, seed?: number) =>
   url ? `${url}${url.includes('?') ? '&' : '?'}t=${seed ?? Date.now()}` : undefined;
 

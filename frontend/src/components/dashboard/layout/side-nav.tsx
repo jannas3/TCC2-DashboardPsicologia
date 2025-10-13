@@ -98,8 +98,8 @@ export function SideNav(): React.JSX.Element {
             <Image
         src="/logo-ifam1.png"       // seu símbolo
         alt="Psicoflow"
-        width={30}
-        height={30}
+        width={37}
+        height={37}
         priority
         style={{
           display: 'block',

@@ -1,15 +1,27 @@
 // src/modules/auth/auth.service.ts
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions, type Secret } from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
 
 type JWTPayload = { sub: string; email: string; role: string };
 
-const JWT_SECRET = process.env.JWT_SECRET!;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
+// ⚠️ TIPAR como Secret evita overload errado
+const JWT_SECRET: Secret = (process.env.JWT_SECRET || 'dev-secret') as Secret;
+
+// Tipar expiresIn usando o próprio tipo do SignOptions evita erro
+const JWT_EXPIRES_IN: SignOptions['expiresIn'] =
+  (process.env.JWT_EXPIRES_IN as any) || '15m';
+
 const JWT_ISSUER = process.env.JWT_ISSUER || 'psicoflow';
+
+// Opcional: consolidar opções
+const SIGN_OPTS: SignOptions = {
+  expiresIn: JWT_EXPIRES_IN,
+  issuer: JWT_ISSUER,
+  algorithm: 'HS256', // se usar HMAC
+};
 
 export const authService = {
   async signUp(email: string, password: string, name?: string) {
@@ -19,16 +31,21 @@ export const authService = {
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: { email, passwordHash, name },
-      select: { id: true, email: true, name: true, role: true, avatarUrl: true, createdAt: true }
+      select: {
+        id: true, email: true, name: true, role: true, createdAt: true, avatarUrl: true,
+      },
     });
-    
-    // Se tem avatarUrl, converte para URL completa
-    if (user.avatarUrl) {
-      user.avatarUrl = `${process.env.API_BASE_URL || 'http://localhost:4000'}${user.avatarUrl}`;
-    }
-    
+
     const token = signToken(user.id, user.email, user.role);
-    return { user, token };
+
+    // -> já envia avatar no signup
+    return {
+      user: {
+        ...user,
+        avatar: user.avatarUrl ?? null,
+      },
+      token,
+    };
   },
 
   async signIn(email: string, password: string) {
@@ -43,9 +60,11 @@ export const authService = {
       email: user.email,
       name: user.name,
       role: user.role,
-      avatarUrl: user.avatarUrl ? `${process.env.API_BASE_URL || 'http://localhost:4000'}${user.avatarUrl}` : user.avatarUrl,
-      createdAt: user.createdAt
+      createdAt: user.createdAt,
+      avatarUrl: user.avatarUrl ?? null,
+      avatar: user.avatarUrl ?? null, // <- o front costuma ler "avatar"
     };
+
     const token = signToken(user.id, user.email, user.role);
     return { user: safeUser, token };
   },
@@ -53,20 +72,25 @@ export const authService = {
   async getMe(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, role: true, avatarUrl: true, createdAt: true }
+      select: {
+        id: true, email: true, name: true, role: true, createdAt: true, avatarUrl: true,
+      }
     });
-    
-    // Se tem avatarUrl, converte para URL completa
-    if (user?.avatarUrl) {
-      const baseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
-      user.avatarUrl = `${baseUrl}${user.avatarUrl}`;
-    }
-    
-    return user;
-  }
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      createdAt: user.createdAt,
+      avatarUrl: user.avatarUrl ?? null,
+      avatar: user.avatarUrl ?? null, // <- espelha para o front
+    };
+  },
 };
 
 function signToken(sub: string, email: string, role: string) {
   const payload: JWTPayload = { sub, email, role };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN, issuer: JWT_ISSUER });
+  return jwt.sign(payload, JWT_SECRET, SIGN_OPTS);
 }

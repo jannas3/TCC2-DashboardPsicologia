@@ -26,12 +26,13 @@ import {
   type GridRenderCellParams,
 } from "@mui/x-data-grid";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import VisibilityIcon from "@mui/icons-material/Visibility";
+  import VisibilityIcon from "@mui/icons-material/Visibility";
 import EventIcon from "@mui/icons-material/Event";
 import SearchIcon from "@mui/icons-material/Search";
 
 import AgendarDialog from "@/app/dashboard/triagem/AgendarDialog";
 import { getScreenings, type Screening, type RiskLevel } from "@/lib/api";
+import type { GridComparatorFn } from "@mui/x-data-grid";
 
 // --- helpers de risco ---
 const riskLabel: Record<RiskLevel, string> = {
@@ -41,13 +42,18 @@ const riskLabel: Record<RiskLevel, string> = {
   MODERADAMENTE_GRAVE: "Mod. Grave",
   GRAVE: "Grave",
 };
-const riskColor: Record<RiskLevel, "default" | "success" | "warning" | "error" | "info"> = {
+
+const riskColor: Record<
+  RiskLevel,
+  "default" | "success" | "warning" | "error" | "info"
+> = {
   MINIMO: "success",
   LEVE: "info",
   MODERADO: "warning",
   MODERADAMENTE_GRAVE: "warning",
   GRAVE: "error",
 };
+
 const riskWeight: Record<RiskLevel, number> = {
   MINIMO: 0,
   LEVE: 1,
@@ -55,17 +61,23 @@ const riskWeight: Record<RiskLevel, number> = {
   MODERADAMENTE_GRAVE: 3,
   GRAVE: 4,
 };
+
 function getOverallRisk(row: Screening): RiskLevel {
   const a = row.riskPHQ9;
   const b = row.riskGAD7;
   return riskWeight[a] >= riskWeight[b] ? a : b;
 }
+
 function RiskChip({ level }: { level: RiskLevel }) {
   return <Chip size="small" color={riskColor[level]} label={riskLabel[level]} />;
 }
+
 function formatDateTime(d?: Date | null) {
   return d
-    ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(d)
+    ? new Intl.DateTimeFormat("pt-BR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(d)
     : "";
 }
 
@@ -83,7 +95,11 @@ function CustomToolbar({
 }) {
   return (
     <GridToolbarContainer>
-      <Stack direction="row" spacing={2} sx={{ width: "100%", p: 1, alignItems: "center" }}>
+      <Stack
+        direction="row"
+        spacing={2}
+        sx={{ width: "100%", p: 1, alignItems: "center" }}
+      >
         <TextField
           size="small"
           placeholder="Buscar por aluno, matrícula, curso…"
@@ -100,10 +116,16 @@ function CustomToolbar({
         />
         <Box flex={1} />
         <GridToolbarDensitySelector />
-        <GridToolbarExport csvOptions={{ utf8WithBom: true, fileName: "triagens" }} />
+        <GridToolbarExport
+          csvOptions={{ utf8WithBom: true, fileName: "triagens" }}
+        />
         <Tooltip title="Atualizar">
           <span>
-            <IconButton onClick={onRefresh} disabled={loading} aria-label="Atualizar lista">
+            <IconButton
+              onClick={onRefresh}
+              disabled={loading}
+              aria-label="Atualizar lista"
+            >
               {loading ? <CircularProgress size={18} /> : <RefreshIcon />}
             </IconButton>
           </span>
@@ -135,9 +157,11 @@ export default function Page() {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     load();
-    const onVis = () => document.visibilityState === "visible" && load();
+    const onVis = () =>
+      document.visibilityState === "visible" && load();
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
@@ -158,6 +182,16 @@ export default function Page() {
   }, [rows, query]);
 
   const onAgendar = (row: Screening) => setAgendarFor(row);
+
+  // --- comparador: risco (desc), empate = data (desc)
+  const riskThenDateComparator: GridComparatorFn<number> = (a, b, p1, p2) => {
+    if (a !== b) return a - b; // compara pesos de risco
+    const row1 = p1.api.getRow(p1.id) as Screening | undefined;
+    const row2 = p2.api.getRow(p2.id) as Screening | undefined;
+    const d1 = row1?.createdAt ? new Date(row1.createdAt).getTime() : 0;
+    const d2 = row2?.createdAt ? new Date(row2.createdAt).getTime() : 0;
+    return d1 - d2; // o DataGrid inverte quando sort = 'desc'
+  };
 
   // --- colunas ---
   const columns: GridColDef<Screening>[] = [
@@ -199,6 +233,7 @@ export default function Page() {
       valueGetter: (_v, row) => riskWeight[getOverallRisk(row)],
       renderCell: (p) => <RiskChip level={getOverallRisk(p.row)} />,
       sortable: true,
+      sortComparator: riskThenDateComparator,
     },
     {
       field: "riscoDetalhe",
@@ -226,7 +261,15 @@ export default function Page() {
         const val = p?.value ?? p?.row?.observacao ?? "";
         return (
           <Tooltip title={val}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", width: "100%" }}>
+            <span
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                display: "block",
+                width: "100%",
+              }}
+            >
               {val}
             </span>
           </Tooltip>
@@ -242,7 +285,11 @@ export default function Page() {
         if (!row) return null;
         return (
           <Tooltip title="Ver relatório completo">
-            <IconButton color="primary" onClick={() => setOpen(row)} aria-label="Ver relatório">
+            <IconButton
+              color="primary"
+              onClick={() => setOpen(row)}
+              aria-label="Ver relatório"
+            >
               <VisibilityIcon />
             </IconButton>
           </Tooltip>
@@ -257,7 +304,10 @@ export default function Page() {
       width: 120,
       renderCell: (p: GridRenderCellParams<Screening>) => (
         <Tooltip title="Agendar">
-          <IconButton onClick={() => onAgendar(p.row)} aria-label="Agendar atendimento">
+          <IconButton
+            onClick={() => onAgendar(p.row)}
+            aria-label="Agendar atendimento"
+          >
             <EventIcon />
           </IconButton>
         </Tooltip>
@@ -270,12 +320,17 @@ export default function Page() {
       headerName: "Telegram ID",
       width: 140,
       valueGetter: (_value, row) => row?.student?.telegramId ?? "",
-      // ❌ 'hide' saiu no v7; usamos columnVisibilityModel no initialState
+      // 'hide' saiu no v7; usamos columnVisibilityModel no initialState
     },
   ];
 
   const ToolbarWrapper = () => (
-    <CustomToolbar onRefresh={load} query={query} setQuery={setQuery} loading={loading} />
+    <CustomToolbar
+      onRefresh={load}
+      query={query}
+      setQuery={setQuery}
+      loading={loading}
+    />
   );
 
   return (
@@ -287,7 +342,9 @@ export default function Page() {
       {error && (
         <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
           <Typography color="error">{error}</Typography>
-          <Button size="small" onClick={load} variant="outlined">Tentar novamente</Button>
+          <Button size="small" onClick={load} variant="outlined">
+            Tentar novamente
+          </Button>
         </Stack>
       )}
 
@@ -306,9 +363,14 @@ export default function Page() {
           disableRowSelectionOnClick
           slots={{ toolbar: ToolbarWrapper }}
           initialState={{
-            sorting: { sortModel: [{ field: "createdAt", sort: "desc" }] },
+            sorting: {
+              sortModel: [
+                { field: "riscoGeral", sort: "desc" }, // risco alto primeiro
+                { field: "createdAt", sort: "desc" },  // empate: mais recente
+              ],
+            },
             pagination: { paginationModel: { pageSize: 10, page: 0 } },
-            columns: { columnVisibilityModel: { telegramId: false } }, // 👈 substitui 'hide'
+            columns: { columnVisibilityModel: { telegramId: false } },
           }}
           pageSizeOptions={[10, 25, 50, 100]}
         />

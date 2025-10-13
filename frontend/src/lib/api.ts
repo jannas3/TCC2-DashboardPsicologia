@@ -5,7 +5,13 @@ export const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   (typeof window === "undefined" ? "http://backend:4000" : "http://localhost:4000");
 
-// ----- helpers de fetch -----
+// axios com /api e credenciais
+import axios from 'axios';
+export const api = axios.create({
+  baseURL: `${BASE_URL}/api`,     // <-- corrigido
+  withCredentials: true,
+  headers: { 'Content-Type': 'application/json' },
+});
 // ----- helpers de fetch -----
 async function parseJsonOrText(res: Response) {
   const ct = res.headers.get("content-type") || "";

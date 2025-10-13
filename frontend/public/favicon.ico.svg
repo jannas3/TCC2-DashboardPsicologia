@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6FC3FF"/>
+      <stop offset="50%" stop-color="#9D8CFF"/>
+      <stop offset="100%" stop-color="#B86BFF"/>
+    </linearGradient>
+  </defs>
+  <!-- Background transparent -->
+  <g fill="none" stroke="url(#grad)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Concentric circles -->
+    <circle cx="256" cy="256" r="120" stroke-width="6" opacity="0.25"/>
+    <circle cx="256" cy="256" r="96"  stroke-width="6" opacity="0.35"/>
+    <circle cx="256" cy="256" r="72"  stroke-width="6" opacity="0.6"/>
+    <circle cx="256" cy="256" r="52"  stroke-width="8" opacity="0.85"/>
+    <!-- Inner squiggly line -->
+    <path d="M216 256
+             C224 244, 232 244, 240 256
+             C248 268, 256 268, 264 256
+             C272 244, 280 244, 288 256
+             C296 268, 304 268, 312 256" 
+          stroke-width="10" opacity="0.95"/>
+  </g>
+</svg>
