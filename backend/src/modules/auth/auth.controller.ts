@@ -8,7 +8,8 @@ export const authController = {
     const parse = signUpSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ errors: parse.error.flatten() });
     try {
-      const { email, password, name } = parse.data;
+      const { password, name } = parse.data;
+      const email = parse.data.email.trim().toLowerCase();
       const result = await authService.signUp(email, password, name);
       return res.status(201).json(result);
     } catch (e: any) {
@@ -20,7 +21,8 @@ export const authController = {
     const parse = signInSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ errors: parse.error.flatten() });
     try {
-      const { email, password } = parse.data;
+      const password = parse.data.password;
+      const email = parse.data.email.trim().toLowerCase();
       const result = await authService.signIn(email, password);
       return res.json(result);
     } catch (e: any) {
