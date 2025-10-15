@@ -2,7 +2,7 @@ PS C:\Users\janaina.ferreira\tcc2> docker compose up -d --build
 >> docker compose exec backend npx prisma generate
 >> docker compose exec backend npx prisma migrate dev --name init
 
-http://localhost:3000/dashboard/triagem
+http://localhost:3001/dashboard/triagem
 
 
 docker compose exec backend npx prisma migrate dev --name init

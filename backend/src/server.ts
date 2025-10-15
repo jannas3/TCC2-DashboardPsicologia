@@ -17,7 +17,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: 'http://localhost:3001',
   credentials: true,
 }));
 app.use(express.json({ limit: "1mb" }));
@@ -34,7 +34,7 @@ app.use('/api/users', avatarRoutes);
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
   setHeaders: (res) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3001');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   }
 }));

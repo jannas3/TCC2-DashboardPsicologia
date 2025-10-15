@@ -4,7 +4,6 @@ import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-// Ajuste estes nomes de papéis conforme seu schema (ex.: 'PROFESSIONAL' por padrão)
 type Role = 'ADMIN' | 'PROFESSIONAL';
 
 async function hashPassword(plain: string) {
@@ -13,7 +12,7 @@ async function hashPassword(plain: string) {
 }
 
 async function main() {
-  // Leitura opcional via .env, com defaults úteis em dev
+  
   const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@teste.com';
   const adminPass  = process.env.SEED_ADMIN_PASS  || 'Admin@1234';
   const adminName  = process.env.SEED_ADMIN_NAME  || 'Admin Teste';
@@ -31,14 +30,13 @@ async function main() {
   for (const u of users) {
     const passwordHash = await hashPassword(u.password);
 
-    // Se o seu modelo for diferente, ajuste os campos abaixo (name/role/passwordHash)
     const result = await prisma.user.upsert({
       where: { email: u.email },
       update: { name: u.name, role: u.role, passwordHash },
       create: { email: u.email, name: u.name, role: u.role, passwordHash }
     });
 
-    // Aviso amigável no console (apenas para dev)
+    
     console.log(`✔ Seed: ${result.email} (${u.role}) pronto. Senha: ${u.password}`);
   }
 }

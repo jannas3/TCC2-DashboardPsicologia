@@ -302,7 +302,7 @@ export default function AgendarDialog({
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={!!ok} autoHideDuration={3000} onClose={() => setOk(null)}>
+      <Snackbar open={!!ok} autoHideDuration={3001} onClose={() => setOk(null)}>
         <Alert severity="success" sx={{ width: "100%" }} onClose={() => setOk(null)}>
           {ok}
         </Alert>

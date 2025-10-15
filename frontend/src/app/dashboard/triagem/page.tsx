@@ -366,7 +366,7 @@ export default function Page() {
             sorting: {
               sortModel: [
                 { field: "riscoGeral", sort: "desc" }, // risco alto primeiro
-                { field: "createdAt", sort: "desc" },  // empate: mais recente
+               
               ],
             },
             pagination: { paginationModel: { pageSize: 10, page: 0 } },
