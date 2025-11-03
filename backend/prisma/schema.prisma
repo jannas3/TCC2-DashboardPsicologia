@@ -1,4 +1,3 @@
-// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -6,6 +5,84 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model Student {
+  id           String        @id @default(cuid())
+  telegramId   String?
+  nome         String
+  idade        Int
+  matricula    String        @unique
+  curso        String
+  periodo      String
+  createdAt    DateTime      @default(now())
+  appointments Appointment[] @relation("StudentAppointments")
+  screenings   Screening[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  role         String   @default("PROFESSIONAL")
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Screening {
+  id              String          @id @default(cuid())
+  studentId       String
+  phq9Respostas   Int[]
+  phq9Score       Int
+  gad7Respostas   Int[]
+  gad7Score       Int
+  disponibilidade String
+  observacao      String?
+  relatorio       String
+  riskPHQ9        RiskLevel
+  riskGAD7        RiskLevel
+  createdAt       DateTime        @default(now())
+  status          ScreeningStatus @default(NEW)
+  appointment     Appointment?
+  student         Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model Appointment {
+  id           String            @id @default(cuid())
+  screeningId  String?           @unique
+  studentId    String?
+  caseId       String?
+  startsAt     DateTime
+  endsAt       DateTime
+  durationMin  Int
+  channel      String
+  professional String
+  status       AppointmentStatus @default(PENDING)
+  note         String?
+  screening    Screening?        @relation(fields: [screeningId], references: [id])
+  student      Student?          @relation("StudentAppointments", fields: [studentId], references: [id])
+  sessionNote  SessionNote?
+
+  @@index([professional, startsAt, endsAt])
+  @@index([studentId])
+}
+
+model SessionNote {
+  id            String      @id @default(cuid())
+  appointmentId String      @unique
+  studentId     String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  before        String?
+  complaint     String?
+  summary       String?
+  observation   String?
+  evolution     String?
+  sharedField   String?
+  fixedNote     String?
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 }
 
 enum RiskLevel {
@@ -16,7 +93,6 @@ enum RiskLevel {
   GRAVE
 }
 
-// >>> NOVO: status da triagem
 enum ScreeningStatus {
   NEW
   REVIEWED
@@ -25,101 +101,10 @@ enum ScreeningStatus {
   ARCHIVED
 }
 
-// >>> NOVO: status de agendamento
 enum AppointmentStatus {
   PENDING
   CONFIRMED
   DONE
   NO_SHOW
   CANCELLED
-}
-
-model Student {
-  id         String   @id @default(cuid())
-  telegramId String?
-  nome       String
-  idade      Int
-  matricula  String   @unique
-  curso      String
-  periodo    String
-  createdAt  DateTime @default(now())
-
-  screenings Screening[]
-appointments Appointment[] @relation("StudentAppointments")
-}
-
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
-  passwordHash String
-  role         String   @default("PROFESSIONAL")
-  avatarUrl    String?   // <-- ADICIONE ISTO
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-}
-
-
-
-model Screening {
-  id        String  @id @default(cuid())
-  studentId String
-  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  phq9Respostas   Int[] // [0..3] x 9
-  phq9Score       Int
-  gad7Respostas   Int[] // [0..3] x 7
-  gad7Score       Int
-  disponibilidade String
-  observacao      String?
-  relatorio       String
-  riskPHQ9        RiskLevel
-  riskGAD7        RiskLevel
-  createdAt       DateTime  @default(now())
-
-  status ScreeningStatus @default(NEW)
-  appointment Appointment?
-}
-
-// >>> NOVO: agendamentos
-model Appointment {
-  id           String            @id @default(cuid())
-  screeningId  String?           @unique
-  screening    Screening?        @relation(fields: [screeningId], references: [id])
-
-  studentId    String?
-  student      Student?          @relation("StudentAppointments", fields: [studentId], references: [id], onDelete: SetNull)
-
-  caseId       String?
-  startsAt     DateTime
-  endsAt       DateTime
-  durationMin  Int
-  channel      String
-  professional String
-  status       AppointmentStatus @default(PENDING)
-  note         String?
-
-  sessionNote  SessionNote?
-
-  @@index([professional, startsAt, endsAt])
-  @@index([studentId])
-}
-
-
-model SessionNote {
-  id            String      @id @default(cuid())
-  appointmentId String      @unique
-  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  studentId     String
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-
-  // campos da tela
-  before      String?
-  complaint   String?
-  summary     String?
-  observation String?
-  evolution   String?
-  sharedField String?
-  fixedNote   String?
 }

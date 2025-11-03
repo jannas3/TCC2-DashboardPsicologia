@@ -230,6 +230,8 @@ export default function Page() {
       headerName: "Risco",
       width: 120,
       type: "number",
+       headerAlign: "center",
+      align: "center",
       valueGetter: (_v, row) => riskWeight[getOverallRisk(row)],
       renderCell: (p) => <RiskChip level={getOverallRisk(p.row)} />,
       sortable: true,
@@ -239,14 +241,22 @@ export default function Page() {
       field: "riscoDetalhe",
       headerName: "PHQ/GAD",
       width: 170,
+      headerAlign: "center",
+      align: "center",
       renderCell: (p: GridRenderCellParams<Screening>) => {
         const r = p?.row;
         if (!r) return null;
         return (
-          <Stack direction="row" spacing={1}>
-            <RiskChip level={r.riskPHQ9} />
-            <RiskChip level={r.riskGAD7} />
-          </Stack>
+           <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        justifyContent="center"
+        sx={{ width: "100%", height: "100%" }}   // 👈 ocupa a célula toda
+      >
+        <RiskChip level={r.riskPHQ9} />
+        <RiskChip level={r.riskGAD7} />
+      </Stack>
         );
       },
       sortable: false,

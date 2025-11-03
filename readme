@@ -6,3 +6,7 @@ http://localhost:3001/dashboard/triagem
 
 
 docker compose exec backend npx prisma migrate dev --name init
+
+
+login:admin@teste.com
+senha: Admin@1234
