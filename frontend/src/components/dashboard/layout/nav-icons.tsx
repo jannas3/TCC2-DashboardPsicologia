@@ -8,9 +8,11 @@ import { XSquare } from '@phosphor-icons/react/dist/ssr/XSquare';
 import { Calendar } from '@phosphor-icons/react/dist/ssr/Calendar';
 import { ChatCircleDots } from '@phosphor-icons/react/dist/ssr/ChatCircleDots';
 import { ClipboardTextIcon } from '@phosphor-icons/react/dist/ssr/ClipboardText';
+import { House } from '@phosphor-icons/react/dist/ssr/House';
 
 export const navIcons = {
   'chart-pie': ChartPieIcon,
+  house: House,
   'gear-six': GearSixIcon,
   'plugs-connected': PlugsConnectedIcon,
   'x-square': XSquare,

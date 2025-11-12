@@ -26,12 +26,18 @@ import {
   type GridRenderCellParams,
 } from "@mui/x-data-grid";
 import RefreshIcon from "@mui/icons-material/Refresh";
-  import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import EventIcon from "@mui/icons-material/Event";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import SearchIcon from "@mui/icons-material/Search";
 
 import AgendarDialog from "@/app/dashboard/triagem/AgendarDialog";
-import { getScreenings, type Screening, type RiskLevel } from "@/lib/api";
+import {
+  deleteScreening,
+  getScreenings,
+  type Screening,
+  type RiskLevel,
+} from "@/lib/api";
 import type { GridComparatorFn } from "@mui/x-data-grid";
 
 // --- helpers de risco ---
@@ -143,6 +149,8 @@ export default function Page() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<Screening | null>(null);
   const [agendarFor, setAgendarFor] = useState<Screening | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Screening | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const load = async () => {
     try {
@@ -182,6 +190,22 @@ export default function Page() {
   }, [rows, query]);
 
   const onAgendar = (row: Screening) => setAgendarFor(row);
+  const onDelete = (row: Screening) => setDeleteTarget(row);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      setDeleteLoading(true);
+      await deleteScreening(deleteTarget.id);
+      setDeleteTarget(null);
+      await load();
+    } catch (e) {
+      const err = e as Error;
+      setError(err.message ?? "Não foi possível remover a triagem");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   // --- comparador: risco (desc), empate = data (desc)
   const riskThenDateComparator: GridComparatorFn<number> = (a, b, p1, p2) => {
@@ -313,14 +337,28 @@ export default function Page() {
       headerName: "Ações",
       width: 120,
       renderCell: (p: GridRenderCellParams<Screening>) => (
-        <Tooltip title="Agendar">
-          <IconButton
-            onClick={() => onAgendar(p.row)}
-            aria-label="Agendar atendimento"
-          >
-            <EventIcon />
-          </IconButton>
-        </Tooltip>
+        <Stack direction="row" spacing={1}>
+          <Tooltip title="Agendar">
+            <IconButton
+              onClick={() => onAgendar(p.row)}
+              aria-label="Agendar atendimento"
+            >
+              <EventIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Excluir triagem">
+            <span>
+              <IconButton
+                color="error"
+                onClick={() => onDelete(p.row)}
+                aria-label="Excluir triagem"
+                disabled={deleteLoading}
+              >
+                <DeleteOutlineIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
       ),
       sortable: false,
       filterable: false,
@@ -419,6 +457,35 @@ export default function Page() {
           load(); // recarrega
         }}
       />
+
+      <Dialog
+        open={!!deleteTarget}
+        onClose={() => (deleteLoading ? null : setDeleteTarget(null))}
+      >
+        <DialogTitle>Remover triagem</DialogTitle>
+        <DialogContent dividers>
+          <Typography>
+            Tem certeza de que deseja excluir a triagem de{" "}
+            <strong>{deleteTarget?.student?.nome}</strong>? Essa ação não pode
+            ser desfeita.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setDeleteTarget(null)}
+            disabled={deleteLoading}
+          >
+            Cancelar
+          </Button>
+          <Button
+            color="error"
+            onClick={handleConfirmDelete}
+            disabled={deleteLoading}
+          >
+            {deleteLoading ? "Removendo..." : "Excluir"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -19,7 +19,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import {
   listAppointments,
   doneAppointment,
-  deleteAppointment,       // 👈 excluir FORA do modal
+  deleteAppointment,
   type Appointment,
   type AppointmentStatus,
   getSessionNote,
@@ -125,14 +125,27 @@ const [statusFilter, setStatusFilter] = useState<"CONFIRMED" | "DONE" | "__ALL__
   }
 
   // excluir atendimento — FORA do modal, na coluna de ações
+  const [deleteTarget, setDeleteTarget] = useState<Appointment | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   async function removeAppointment(id: string) {
-    if (!confirm("Deseja excluir este atendimento?")) return;
+    const target = items.find((a) => a.id === id) ?? null;
+    setDeleteTarget(target);
+    setErr(null);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
     try {
-      await deleteAppointment(id);
-      if (open?.id === id) setOpen(null);
+      setDeleteLoading(true);
+      await deleteAppointment(deleteTarget.id);
+      if (open?.id === deleteTarget.id) setOpen(null);
+      setDeleteTarget(null);
       await load();
     } catch (e) {
-      alert((e as Error).message || "Falha ao excluir atendimento.");
+      setErr((e as Error).message || "Falha ao excluir atendimento.");
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -286,6 +299,29 @@ const [statusFilter, setStatusFilter] = useState<"CONFIRMED" | "DONE" | "__ALL__
             Salvar e concluir
           </Button>
 
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={!!deleteTarget}
+        onClose={() => (deleteLoading ? null : setDeleteTarget(null))}
+      >
+        <DialogTitle>Excluir atendimento</DialogTitle>
+        <DialogContent dividers>
+          <Typography>
+            Confirma a exclusão do atendimento de{" "}
+            <strong>{deleteTarget?.student?.nome ?? "Aluno"}</strong> das{" "}
+            {deleteTarget ? fmtTime(deleteTarget.startsAt) : ""} às{" "}
+            {deleteTarget ? fmtTime(deleteTarget.endsAt) : ""}? Essa ação é permanente.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)} disabled={deleteLoading}>
+            Cancelar
+          </Button>
+          <Button color="error" onClick={confirmDelete} disabled={deleteLoading}>
+            {deleteLoading ? "Excluindo..." : "Excluir"}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

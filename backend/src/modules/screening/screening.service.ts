@@ -79,3 +79,9 @@ export async function listScreenings(limit = 20) {
     },
   });
 }
+
+export async function removeScreening(id: string) {
+  return prisma.screening.delete({
+    where: { id },
+  });
+}

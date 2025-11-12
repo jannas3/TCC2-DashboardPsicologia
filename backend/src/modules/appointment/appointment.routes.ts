@@ -120,7 +120,7 @@ router.post("/", async (req: Request, res: Response) => {
         durationMin: Number(durationMin),
         professional,
         channel,
-        status: "PENDING",
+        status: "CONFIRMED",
         note: note ?? null,
       },
       include: { student: { select: { id: true, nome: true, matricula: true } } },

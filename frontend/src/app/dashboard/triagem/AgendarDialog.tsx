@@ -176,7 +176,7 @@ export default function AgendarDialog({
 
     let msg = raw || "Falha ao agendar";
     if (isConflict) {
-      msg = "Conflito de horário: já existe um atendimento no mesmo intervalo para este profissional. Escolha outro horário.";
+      msg = "Este profissional já possui um atendimento neste intervalo. Ajuste o horário ou escolha outra faixa livre.";
     } else if (isValidation) {
       msg = `Dados inválidos: ${raw}`;
     }

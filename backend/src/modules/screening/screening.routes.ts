@@ -1,7 +1,8 @@
 ﻿import { Router } from "express";
-import { postScreening } from "./screening.controller.js";
+import { deleteScreening, postScreening } from "./screening.controller.js";
 import { botAuth } from "../../middlewares/botAuth.js";
 import { prisma } from "../../db/prisma.js";
+import { requireAuth } from "../../middlewares/require-auth.js";
 
 const router = Router();
 
@@ -55,5 +56,6 @@ router.patch("/:id/status", async (req, res) => {
   }
 });
 
+router.delete("/:id", requireAuth, deleteScreening);
 
 export default router;

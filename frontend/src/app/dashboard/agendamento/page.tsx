@@ -56,6 +56,38 @@ const statusColor: Record<Status, "default" | "info" | "success" | "warning" | "
   CANCELLED: "error",
 };
 
+type EventLayout = { col: number; cols: number };
+
+function computeEventLayout(events: Appointment[]): EventLayout[] {
+  const layouts: EventLayout[] = events.map(() => ({ col: 0, cols: 1 }));
+  const active: { index: number; end: number; col: number }[] = [];
+
+  events.forEach((ev, idx) => {
+    const start = new Date(ev.startsAt).getTime();
+    const end = new Date(ev.endsAt).getTime();
+
+    for (let i = active.length - 1; i >= 0; i -= 1) {
+      if (active[i].end <= start) {
+        active.splice(i, 1);
+      }
+    }
+
+    const usedCols = new Set(active.map((item) => item.col));
+    let col = 0;
+    while (usedCols.has(col)) col += 1;
+
+    active.push({ index: idx, end, col });
+    layouts[idx].col = col;
+
+    const concurrentCols = active.reduce((acc, item) => Math.max(acc, item.col + 1), col + 1);
+    active.forEach((item) => {
+      layouts[item.index].cols = Math.max(layouts[item.index].cols, concurrentCols);
+    });
+  });
+
+  return layouts;
+}
+
 function startOfWeek(date = new Date()) {
   const d = new Date(date);
   const day = d.getDay();
@@ -293,6 +325,8 @@ export default function Page() {
               return endM > winStart && startM < winEnd;
             });
 
+            const layouts = computeEventLayout(dayEvents);
+
             return (
               <Box
                 key={idx}
@@ -321,7 +355,7 @@ export default function Page() {
                 ))}
 
                 {/* eventos */}
-                {dayEvents.map((ev) => {
+                {dayEvents.map((ev, evIdx) => {
                   const start = new Date(ev.startsAt);
                   const end = new Date(ev.endsAt);
                   const startMins = start.getHours() * 60 + start.getMinutes();
@@ -331,6 +365,9 @@ export default function Page() {
 
                   const top = clamp((topMins / 60) * HOUR_HEIGHT, 0, (END_HOUR - START_HOUR) * HOUR_HEIGHT);
                   const height = Math.max(24, (heightMins / 60) * HOUR_HEIGHT - 4);
+                  const layout = layouts[evIdx];
+                  const slotWidth = 100 / layout.cols;
+                  const leftPercent = slotWidth * layout.col;
 
                   return (
                     <Tooltip
@@ -342,8 +379,8 @@ export default function Page() {
                         onClick={() => { setSelected(ev); setMsg(null); setActError(null); }}
                         sx={{
                           position: "absolute",
-                          left: 6,
-                          right: 6,
+                          left: `calc(${leftPercent}% + 6px)`,
+                          width: `calc(${slotWidth}% - 12px)`,
                           top,
                           height,
                           bgcolor: (theme) =>

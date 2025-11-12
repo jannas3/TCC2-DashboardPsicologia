@@ -2,7 +2,7 @@ import type { NavItemConfig } from '@/types/nav';
 import { paths } from '@/paths';
 
 export const navItems = [
-  { key: 'overview', title: 'Dashboard', href: paths.dashboard.overview, icon: 'chart-pie' },
+  { key: 'overview', title: 'Dashboard', href: paths.dashboard.overview, icon: 'house' },
   { key: 'triagem', title: 'Triagem', href: paths.dashboard.triagem, icon: 'clipboard-text' },
   { key: 'agendamento', title: 'Agendamento', href: paths.dashboard.agendamento, icon: 'calendar' },
   { key: 'atendimento', title: 'Atendimento', href: paths.dashboard.atendimento, icon: 'chat-circle-dots' },

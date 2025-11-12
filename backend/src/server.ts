@@ -4,12 +4,14 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
-import path from 'node:path';
+import path from "node:path";
+import swaggerUi from "swagger-ui-express";
 import appointmentRoutes from "./modules/appointment/appointment.routes.js";
 import screeningRoutes from "./modules/screening/screening.routes.js";
 import studentRoutes from "./modules/student/student.routes.js";
 import authRoutes from "./modules/auth/auth.routes";
-import avatarRoutes from './modules/users/avatar.routes';
+import avatarRoutes from "./modules/users/avatar.routes";
+import { swaggerDocument } from "./docs/swagger.js";
 
 const app = express();
 
@@ -24,6 +26,7 @@ app.use(express.json({ limit: "1mb" }));
 app.use(morgan("dev"));
 app.use(rateLimit({ windowMs: 60_000, max: 120 }));
 
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument, { explorer: true }));
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 app.use("/api/auth", authRoutes);

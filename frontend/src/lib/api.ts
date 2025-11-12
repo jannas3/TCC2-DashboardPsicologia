@@ -153,6 +153,14 @@ export async function getScreenings(limit = 50): Promise<Screening[]> {
   return okOrThrow<Screening[]>(res);
 }
 
+export async function deleteScreening(id: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/screenings/${id}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  await okOrThrow(res);
+}
+
 // ===================== APPOINTMENTS API =====================
 export async function listAppointments(params: {
   from: string; to: string; professional?: string; channel?: string; status?: AppointmentStatus;

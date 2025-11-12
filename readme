@@ -1,12 +1,41 @@
-PS C:\Users\janaina.ferreira\tcc2> docker compose up -d --build
->> docker compose exec backend npx prisma generate
->> docker compose exec backend npx prisma migrate dev --name init
+TCC2 Dashboard – Guia de Execução
+================================
 
-http://localhost:3001/dashboard/triagem
+Pré-requisitos
+--------------
+- Docker e Docker Compose instalados.
+- Porta `3001` (frontend) e `4000` (backend) livres na máquina.
 
+Subindo com Docker Compose
+--------------------------
+1. Acesse a pasta do projeto:
+   ```
+   cd TCC2-DashboardPsicologia
+   ```
+2. Suba os serviços (frontend, backend e banco):
+   ```
+   docker compose up --build -d
+   ```
+3. Aplique as migrações e gere o client Prisma:
+   ```
+   docker compose exec backend npx prisma generate
+   docker compose exec backend npx prisma migrate deploy
+   ```
+   > Em ambiente de desenvolvimento você pode usar `migrate dev` se preferir:
+   > `docker compose exec backend npx prisma migrate dev --name init`
 
-docker compose exec backend npx prisma migrate dev --name init
+URLs importantes
+----------------
+- Portal: <http://localhost:3001/dashboard/triagem>
+- API health-check: <http://localhost:4000/health>
+- Documentação Swagger: <http://localhost:4000/docs>
 
+Credenciais padrão
+------------------
+- Usuário: `admin@teste.com`
+- Senha: `Admin@1234`
 
-login:admin@teste.com
-senha: Admin@1234
+Comandos úteis
+--------------
+- Ver logs do backend: `docker compose logs -f backend`
+- Parar todos os serviços: `docker compose down`
