@@ -44,6 +44,7 @@ model Screening {
   riskPHQ9        RiskLevel
   riskGAD7        RiskLevel
   createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
   status          ScreeningStatus @default(NEW)
   appointment     Appointment?
   student         Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -99,6 +100,8 @@ enum ScreeningStatus {
   SCHEDULED
   CONVERTED
   ARCHIVED
+  AGENDADA
+  CONCLUIDA
 }
 
 enum AppointmentStatus {

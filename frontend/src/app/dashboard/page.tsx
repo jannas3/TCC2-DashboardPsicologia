@@ -74,7 +74,7 @@ export default function Page(): React.JSX.Element {
   // KPIs
   const [attendedStudents, setAttendedStudents] = React.useState(0);
   const [scheduledNext7, setScheduledNext7] = React.useState(0);
-  const [casesInProgress, setCasesInProgress] = React.useState(0);
+  const [activeTriages, setActiveTriages] = React.useState(0);
   const [atRiskStudents, setAtRiskStudents] = React.useState(0);
   const [doneToday, setDoneToday] = React.useState(0);
 
@@ -114,6 +114,11 @@ export default function Page(): React.JSX.Element {
     ]);
 
     setScreeningsState(screenings);
+    setActiveTriages(
+      screenings.filter(
+        (s) => (s.status ?? "").toString().toUpperCase() !== "CONCLUIDA"
+      ).length
+    );
 
     const all = appts.map((a) => ({ ...a, status: normalizeStatus(a.status) }));
 
@@ -139,16 +144,6 @@ export default function Page(): React.JSX.Element {
           (a.status === "PENDING" || a.status === "CONFIRMED") &&
           new Date(a.startsAt) >= today &&
           new Date(a.startsAt) <= in7
-      ).length
-    );
-
-    // casos em acompanhamento (próx 60d)
-    setCasesInProgress(
-      all.filter(
-        (a) =>
-          (a.status === "PENDING" || a.status === "CONFIRMED") &&
-          new Date(a.startsAt) >= today &&
-          new Date(a.startsAt) <= in60
       ).length
     );
 
@@ -371,15 +366,6 @@ export default function Page(): React.JSX.Element {
     [alertsSevere]
   );
 
-  // TasksProgress: % de casos em acompanhamento
-  const tasksValue = React.useMemo(() => {
-    const total = futureAppointments.length || 1;
-    const inProgress = futureAppointments.filter(
-      (a) => a.status === "PENDING" || a.status === "CONFIRMED"
-    ).length;
-    return Math.min(100, Math.round((inProgress / total) * 100));
-  }, [futureAppointments]);
-
   return (
     <>
       <Box sx={{ flexGrow: 1, py: 4 }}>
@@ -404,7 +390,7 @@ export default function Page(): React.JSX.Element {
               trend="up"
             />
             <TotalCustomers value={String(scheduledNext7)} trend="up" />
-            <TasksProgress value={tasksValue} />
+            <TasksProgress value={activeTriages} />
             <TotalProfit value={String(atRiskStudents)} />
             <Budget title="Concluídos hoje" value={String(doneToday)} trend="up" />
           </Box>

@@ -7,13 +7,17 @@ import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import InputBase from '@mui/material/InputBase';
 import Tooltip from '@mui/material/Tooltip';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 
-import { List as ListIcon } from '@phosphor-icons/react/dist/ssr/List';
+import MenuIcon from '@mui/icons-material/Menu';
+import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import { Bell as BellIcon } from '@phosphor-icons/react/dist/ssr/Bell';
 
 import { MobileNav } from './mobile-nav';
 import { UserPopover } from './user-popover';
 import { useUser } from '@/hooks/use-user';
+import { useSideNavState } from '@/hooks/use-sidenav';
 
 const DEFAULT_AVATAR = '/assets/avatar.png';
 
@@ -35,6 +39,9 @@ function withCacheBuster(url?: string | null, seed?: number) {
 export function MainNav(): React.JSX.Element {
   const [openNav, setOpenNav] = React.useState(false);
   const [userMenuEl, setUserMenuEl] = React.useState<HTMLElement | null>(null);
+  const { open: isSideNavOpen, toggle: toggleSideNav } = useSideNavState();
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('lg'));
 
   // tipagem local do hook
   const { user } = useUser() as { user: UIUser | null };
@@ -63,6 +70,31 @@ export function MainNav(): React.JSX.Element {
   const handleUserOpen = (event: React.MouseEvent<HTMLElement>) => setUserMenuEl(event.currentTarget);
   const handleUserClose = () => setUserMenuEl(null);
 
+  React.useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      if (event.key !== '/') return;
+      event.preventDefault();
+      if (isDesktop) {
+        toggleSideNav();
+      } else {
+        setOpenNav(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [isDesktop, toggleSideNav]);
+
+  const handleToggle = () => {
+    toggleSideNav();
+    if (!isDesktop) {
+      setOpenNav(prev => !prev);
+    }
+  };
+
+  const isExpanded = isDesktop ? isSideNavOpen : openNav;
+
   return (
     <>
       <Box
@@ -80,30 +112,29 @@ export function MainNav(): React.JSX.Element {
           borderColor: 'divider',
         }}
       >
-        {/* Botão 3 risquinhos */}
-        <IconButton
-          onClick={() => {
-            if (typeof window !== 'undefined') {
-              const isDesktop = window.matchMedia('(min-width: 1200px)').matches; // lg
-              if (isDesktop) {
-                window.dispatchEvent(new CustomEvent('psico-toggle-sidenav-hidden'));
-              } else {
-                setOpenNav(true); // no mobile abre o Drawer
-              }
-            }
-          }}
-          sx={{
-            border: '2px solid',
-            borderColor: 'primary.light',
-            borderRadius: 2,
-            width: 44,
-            height: 36,
-            '&:hover': { backgroundColor: 'action.hover' },
-          }}
-          aria-label="Abrir/fechar menu"
-        >
-          <ListIcon size={20} weight="bold" />
-        </IconButton>
+        {/* Botão toggle sidebar */}
+        <Tooltip title={`${isExpanded ? 'Recolher' : 'Expandir'} sidebar (Ctrl+/)`}>
+          <span>
+            <IconButton
+              onClick={handleToggle}
+              sx={{
+                border: '2px solid',
+                borderColor: 'primary.light',
+                borderRadius: 2,
+                width: 44,
+                height: 36,
+                '&:hover': { backgroundColor: 'action.hover' },
+              }}
+              aria-label={isExpanded ? 'Recolher menu lateral' : 'Abrir menu lateral'}
+            >
+              {isExpanded ? (
+                <MenuOpenIcon sx={{ fontSize: 26 }} />
+              ) : (
+                <MenuIcon sx={{ fontSize: 26 }} />
+              )}
+            </IconButton>
+          </span>
+        </Tooltip>
 
         {/* Busca pequena */}
         <Box

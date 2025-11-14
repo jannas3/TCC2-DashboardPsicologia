@@ -70,9 +70,19 @@ export type StudentCreate = Omit<Student, "id" | "createdAt">;
 export type StudentUpdate = Partial<StudentCreate>;
 
 // ---------- SCREENINGS ----------
+export type ScreeningStatus =
+  | "NEW"
+  | "REVIEWED"
+  | "SCHEDULED"
+  | "CONVERTED"
+  | "ARCHIVED"
+  | "AGENDADA"
+  | "CONCLUIDA";
+
 export interface Screening {
   id: string;
   createdAt: string;
+  updatedAt?: string;
   phq9Score: number;
   gad7Score: number;
   riskPHQ9: RiskLevel;
@@ -80,6 +90,14 @@ export interface Screening {
   disponibilidade: string;
   observacao: string | null;
   relatorio: string;
+  status?: ScreeningStatus | string;
+  profissionalResponsavel?: string | null;
+  phq9Respostas?: number[];
+  gad7Respostas?: number[];
+  resumoIa?: string | null;
+  appointment?: {
+    professional?: string | null;
+  } | null;
   student: {
     nome: string;
     matricula: string;
@@ -147,10 +165,48 @@ export async function deleteStudent(id: string): Promise<void> {
   await okOrThrow(res);
 }
 
-// ===================== SCREENINGS API =====================
-export async function getScreenings(limit = 50): Promise<Screening[]> {
-  const res = await fetch(`${BASE_URL}/api/screenings?limit=${limit}`, { cache: "no-store" });
+function normalizeStatusParam(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleUpperCase();
+}
+
+export async function listScreenings(params?: {
+  limit?: number;
+  status?: string;
+  excludeStatus?: string;
+}): Promise<Screening[]> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.status) {
+    qs.set("status", normalizeStatusParam(params.status));
+  } else if (params?.excludeStatus) {
+    qs.set("statusNot", normalizeStatusParam(params.excludeStatus));
+  }
+  const res = await fetch(`${BASE_URL}/api/screenings${qs.size ? `?${qs.toString()}` : ""}`, {
+    cache: "no-store",
+  });
   return okOrThrow<Screening[]>(res);
+}
+
+export async function getScreenings(limitOrParams?: number | { limit?: number; status?: string; excludeStatus?: string }) {
+  if (typeof limitOrParams === "number" || typeof limitOrParams === "undefined") {
+    return listScreenings({ limit: typeof limitOrParams === "number" ? limitOrParams : undefined });
+  }
+  return listScreenings(limitOrParams);
+}
+
+export async function getScreeningsByStatus(status: string): Promise<Screening[]> {
+  return listScreenings({ status });
+}
+
+export async function updateScreeningStatus(id: string, status: string): Promise<Screening> {
+  const normalized = normalizeStatusParam(status);
+  const res = await api.patch<Screening>(`/screenings/${id}/status`, {
+    status: normalized,
+  });
+  return res.data;
 }
 
 export async function deleteScreening(id: string): Promise<void> {

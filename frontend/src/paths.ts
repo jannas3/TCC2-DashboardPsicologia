@@ -4,6 +4,7 @@ export const paths = {
   dashboard: {
     overview: '/dashboard',
     triagem: '/dashboard/triagem',
+    triagemHistorico: '/dashboard/triagem/historico',
     agendamento: '/dashboard/agendamento',
     atendimento: '/dashboard/atendimento',
     account: '/dashboard/account',

@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 
 import Image from 'next/image';
@@ -14,45 +15,30 @@ import Link from 'next/link';
 
 import type { NavItemConfig } from '@/types/nav';
 import { isNavItemActive } from '@/lib/is-nav-item-active';
+import { useSideNavState } from '@/hooks/use-sidenav';
 import { navItems } from './config';
 import { navIcons } from './nav-icons';
 
 export function SideNav(): React.JSX.Element {
   const pathname = usePathname();
- const widthOpen = 260;
+  const { collapsed } = useSideNavState();
 
-  const [hidden, setHidden] = React.useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return window.localStorage.getItem('psico-sidenav-hidden') === '1';
-  });
+  const widthOpen = 260;
+  const widthCollapsed = 72;
 
-  const applyWidthVar = React.useCallback((isHidden: boolean) => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.style.setProperty(
-        '--SideNav-width-current',
-        isHidden ? '0px' : `${widthOpen}px`
-      );
-    }
-  }, []);
-
-  React.useEffect(() => {
-    applyWidthVar(hidden);
-  }, [hidden, applyWidthVar]);
+  const applyWidthVar = React.useCallback(
+    (isCollapsed: boolean) => {
+      if (typeof document !== 'undefined') {
+        const width = isCollapsed ? widthCollapsed : widthOpen;
+        document.documentElement.style.setProperty('--SideNav-width-current', `${width}px`);
+      }
+    },
+    [widthCollapsed, widthOpen]
+  );
 
   React.useEffect(() => {
-    const onToggleHidden = () => {
-      setHidden(prev => {
-        const next = !prev;
-        try {
-          window.localStorage.setItem('psico-sidenav-hidden', next ? '1' : '0');
-        } catch {}
-        applyWidthVar(next);
-        return next;
-      });
-    };
-    window.addEventListener('psico-toggle-sidenav-hidden', onToggleHidden);
-    return () => window.removeEventListener('psico-toggle-sidenav-hidden', onToggleHidden);
-  }, [applyWidthVar]);
+    applyWidthVar(collapsed);
+  }, [collapsed, applyWidthVar]);
 
   return (
     <Box
@@ -73,11 +59,12 @@ export function SideNav(): React.JSX.Element {
         left: 0,
         top: 0,
         position: 'fixed',
-        width: { lg: hidden ? '0px' : `${widthOpen}px` },
+        width: {
+          lg: collapsed ? `${widthCollapsed}px` : `${widthOpen}px`,
+        },
         transition: 'width .2s ease',
         overflow: 'hidden',
-        visibility: hidden ? 'hidden' : 'visible',
-        pointerEvents: hidden ? 'none' : 'auto',
+        pointerEvents: 'auto',
         zIndex: 'var(--SideNav-zIndex)',
       }}
     >
@@ -94,12 +81,12 @@ export function SideNav(): React.JSX.Element {
         }}
       >
         <Link href="/" style={{ textDecoration: 'none' }}>
-          <Stack direction="row" alignItems="center" spacing={1.25}>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
             <Image
         src="/logo-ifam1.png"       // seu símbolo
         alt="Psicoflow"
-        width={37}
-        height={37}
+        width={48}
+        height={48}
         priority
         style={{
           display: 'block',
@@ -112,7 +99,7 @@ export function SideNav(): React.JSX.Element {
         variant="h6"
         sx={{
           fontWeight: 700,
-          fontSize: '1.05rem',
+          fontSize: '1.3rem',
           lineHeight: 1,
           letterSpacing: '-0.01em',
           color: '#E0E0E0'
@@ -129,32 +116,21 @@ export function SideNav(): React.JSX.Element {
 
       {/* navegação */}
       <Box component="nav" sx={{ flex: 1, p: '12px 0 0 0' }}>
-        {renderNavItems({ pathname, items: navItems })}
+        <Stack component="ul" spacing={0.5} sx={{ listStyle: 'none', m: 0, p: 0 }}>
+          {navItems.map(({ key, ...item }) => (
+            <Box component="li" key={key} sx={{ listStyle: 'none' }}>
+              <NavItem pathname={pathname} collapsed={collapsed} {...item} />
+            </Box>
+          ))}
+        </Stack>
       </Box>
     </Box>
   );
 }
 
-function renderNavItems({
-  items = [],
-  pathname,
-}: {
-  items?: NavItemConfig[];
+interface NavItemProps extends NavItemConfig {
   pathname: string;
-}): React.JSX.Element {
-  const children = items.map(({ key, ...item }) => (
-    <NavItem key={key} pathname={pathname} {...item} />
-  ));
-
-  return (
-    <Stack component="ul" spacing={1} sx={{ listStyle: 'none', m: 0, p: 0 }}>
-      {children}
-    </Stack>
-  );
-}
-
-interface NavItemProps extends Omit<NavItemConfig, 'items'> {
-  pathname: string;
+  collapsed?: boolean;
 }
 
 function NavItem({
@@ -165,60 +141,82 @@ function NavItem({
   matcher,
   pathname,
   title,
+  collapsed = false,
 }: NavItemProps): React.JSX.Element {
-  const active = isNavItemActive({ disabled, external, href, matcher, pathname });
   const Icon = icon ? navIcons[icon] : null;
+  const active = isNavItemActive({ disabled, external, href, matcher, pathname });
 
-  return (
-    <li>
-      <Box
-        {...(href
-          ? {
-              component: external ? 'a' : RouterLink,
-              href,
-              target: external ? '_blank' : undefined,
-              rel: external ? 'noreferrer' : undefined,
-            }
-          : { role: 'button' })}
-        sx={{
-          alignItems: 'center',
-          borderRadius: 1,
-          color: 'var(--NavItem-color)',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          display: 'flex',
-          gap: 1,
-          p: '6px 12px',
-          textDecoration: 'none',
-          whiteSpace: 'nowrap',
-          ...(active && {
-            bgcolor: 'var(--NavItem-active-background)',
-            color: 'var(--NavItem-active-color)',
-          }),
-          '&:hover': { bgcolor: 'var(--NavItem-hover-background)' },
-        }}
-      >
-        <Box sx={{ width: 28, display: 'flex', justifyContent: 'center', flex: '0 0 auto' }}>
-          {Icon ? (
-            <Icon
-              fill={active ? 'var(--NavItem-icon-active-color)' : 'var(--NavItem-icon-color)'}
-              fontSize="var(--icon-fontSize-md)"
-              weight={active ? 'fill' : undefined}
-            />
-          ) : null}
+  const baseStyles = {
+    alignItems: 'center',
+    borderRadius: 1,
+    color: 'var(--NavItem-color)',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    display: 'flex',
+    gap: 1,
+    minHeight: 40,
+    pl: '12px',
+    pr: '12px',
+    py: '6px',
+    textDecoration: 'none',
+    whiteSpace: 'nowrap',
+    ...(active && {
+      bgcolor: 'var(--NavItem-active-background)',
+      color: 'var(--NavItem-active-color)',
+    }),
+    '&:hover': { bgcolor: 'var(--NavItem-hover-background)' },
+  } as const;
+
+  const componentProps = href
+    ? {
+        component: external ? 'a' : RouterLink,
+        href,
+        target: external ? '_blank' : undefined,
+        rel: external ? 'noreferrer' : undefined,
+      }
+    : { role: 'button' as const };
+
+  const content = (
+    <Box
+      {...componentProps}
+      sx={{
+        ...baseStyles,
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        title: collapsed ? title : undefined,
+      }}
+    >
+      {Icon ? (
+        <Box sx={{ width: 36, display: 'flex', justifyContent: 'center', flex: '0 0 auto' }}>
+          <Icon
+            fill={active ? 'var(--NavItem-icon-active-color)' : 'var(--NavItem-icon-color)'}
+            fontSize="1.5rem"
+            weight={active ? 'fill' : undefined}
+          />
         </Box>
+      ) : null}
 
+      {!collapsed && (
         <Typography
           component="span"
           sx={{
             color: 'inherit',
-            fontSize: '0.875rem',
-            fontWeight: 500,
+            fontSize: '1.125rem',
+            fontWeight: 600,
             lineHeight: '28px',
           }}
         >
           {title}
         </Typography>
-      </Box>
-    </li>
+      )}
+    </Box>
   );
+
+  if (collapsed) {
+    return (
+      <Tooltip title={title} placement="right" enterDelay={500}>
+        <span>{content}</span>
+      </Tooltip>
+    );
+  }
+
+  return content;
 }

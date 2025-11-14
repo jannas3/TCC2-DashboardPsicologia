@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Chip,
   IconButton,
@@ -155,7 +156,7 @@ export default function Page() {
   const load = async () => {
     try {
       setLoading(true);
-      const r = await getScreenings(100);
+      const r = await getScreenings({ limit: 100, excludeStatus: "concluida" });
       setRows(r);
       setError(null);
     } catch (e) {
@@ -191,6 +192,10 @@ export default function Page() {
 
   const onAgendar = (row: Screening) => setAgendarFor(row);
   const onDelete = (row: Screening) => setDeleteTarget(row);
+
+  const handleScreeningScheduled = (id: string) => {
+    setRows((prev) => prev.filter((item) => item.id !== id));
+  };
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
@@ -340,6 +345,7 @@ export default function Page() {
         <Stack direction="row" spacing={1}>
           <Tooltip title="Agendar">
             <IconButton
+              // Ao agendar, a triagem é movida para o histórico (ver AgendarDialog.onScreeningScheduled)
               onClick={() => onAgendar(p.row)}
               aria-label="Agendar atendimento"
             >
@@ -388,12 +394,17 @@ export default function Page() {
       </Typography>
 
       {error && (
-        <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-          <Typography color="error">{error}</Typography>
-          <Button size="small" onClick={load} variant="outlined">
-            Tentar novamente
-          </Button>
-        </Stack>
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={load}>
+              Tentar novamente
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
       )}
 
       <Box
@@ -452,8 +463,8 @@ export default function Page() {
         open={!!agendarFor}
         onClose={() => setAgendarFor(null)}
         screening={agendarFor}
+        onScreeningScheduled={handleScreeningScheduled}
         onSaved={() => {
-          setAgendarFor(null);
           load(); // recarrega
         }}
       />

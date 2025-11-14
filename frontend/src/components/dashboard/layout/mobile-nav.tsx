@@ -107,79 +107,104 @@ export function MobileNav({ open, onClose }: MobileNavProps): React.JSX.Element 
   );
 }
 
-function renderNavItems({ items = [], pathname }: { items?: NavItemConfig[]; pathname: string }): React.JSX.Element {
-  const children = items.reduce((acc: React.ReactNode[], curr: NavItemConfig): React.ReactNode[] => {
-    const { key, ...item } = curr;
-
-    acc.push(<NavItem key={key} pathname={pathname} {...item} />);
-
-    return acc;
-  }, []);
-
+function renderNavItems({
+  items = [],
+  pathname,
+  depth = 0,
+}: {
+  items?: NavItemConfig[];
+  pathname: string;
+  depth?: number;
+}): React.JSX.Element {
   return (
-    <Stack component="ul" spacing={1} sx={{ listStyle: 'none', m: 0, p: 0 }}>
-      {children}
+    <Stack component="ul" spacing={0.5} sx={{ listStyle: 'none', m: 0, p: 0 }}>
+      {items.map(({ key, items: childItems, ...item }) => (
+        <Box component="li" key={key} sx={{ listStyle: 'none' }}>
+          <NavItem pathname={pathname} depth={depth} {...item} />
+          {childItems?.length ? (
+            <Box sx={{ mt: 0.5, pl: depth === 0 ? 3 : 2 }}>
+              {renderNavItems({ items: childItems, pathname, depth: depth + 1 })}
+            </Box>
+          ) : null}
+        </Box>
+      ))}
     </Stack>
   );
 }
 
 interface NavItemProps extends Omit<NavItemConfig, 'items'> {
   pathname: string;
+  depth?: number;
 }
 
-function NavItem({ disabled, external, href, icon, matcher, pathname, title }: NavItemProps): React.JSX.Element {
+function NavItem({
+  disabled,
+  external,
+  href,
+  icon,
+  matcher,
+  pathname,
+  title,
+  depth = 0,
+}: NavItemProps): React.JSX.Element {
   const active = isNavItemActive({ disabled, external, href, matcher, pathname });
-  const Icon = icon ? navIcons[icon] : null;
+  const Icon = depth === 0 && icon ? navIcons[icon] : null;
 
   return (
-    <li>
-      <Box
-        {...(href
-          ? {
-              component: external ? 'a' : RouterLink,
-              href,
-              target: external ? '_blank' : undefined,
-              rel: external ? 'noreferrer' : undefined,
-            }
-          : { role: 'button' })}
-        sx={{
-          alignItems: 'center',
-          borderRadius: 1,
-          color: 'var(--NavItem-color)',
-          cursor: 'pointer',
-          display: 'flex',
-          flex: '0 0 auto',
-          gap: 1,
-          p: '6px 16px',
-          position: 'relative',
-          textDecoration: 'none',
-          whiteSpace: 'nowrap',
-          ...(disabled && {
-            bgcolor: 'var(--NavItem-disabled-background)',
-            color: 'var(--NavItem-disabled-color)',
-            cursor: 'not-allowed',
-          }),
-          ...(active && { bgcolor: 'var(--NavItem-active-background)', color: 'var(--NavItem-active-color)' }),
-        }}
-      >
+    <Box
+      {...(href
+        ? {
+            component: external ? 'a' : RouterLink,
+            href,
+            target: external ? '_blank' : undefined,
+            rel: external ? 'noreferrer' : undefined,
+          }
+        : { role: 'button' })}
+      sx={{
+        alignItems: 'center',
+        borderRadius: 1,
+        color: 'var(--NavItem-color)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'flex',
+        flex: '0 0 auto',
+        gap: 1,
+        minHeight: 40,
+        pl: depth === 0 ? '16px' : `${16 + depth * 16}px`,
+        pr: '16px',
+        py: '6px',
+        position: 'relative',
+        textDecoration: 'none',
+        whiteSpace: 'nowrap',
+        ...(disabled && {
+          bgcolor: 'var(--NavItem-disabled-background)',
+          color: 'var(--NavItem-disabled-color)',
+          cursor: 'not-allowed',
+        }),
+        ...(active && { bgcolor: 'var(--NavItem-active-background)', color: 'var(--NavItem-active-color)' }),
+      }}
+    >
+      {Icon ? (
         <Box sx={{ alignItems: 'center', display: 'flex', justifyContent: 'center', flex: '0 0 auto' }}>
-          {Icon ? (
-            <Icon
-              fill={active ? 'var(--NavItem-icon-active-color)' : 'var(--NavItem-icon-color)'}
-              fontSize="var(--icon-fontSize-md)"
-              weight={active ? 'fill' : undefined}
-            />
-          ) : null}
+          <Icon
+            fill={active ? 'var(--NavItem-icon-active-color)' : 'var(--NavItem-icon-color)'}
+            fontSize="var(--icon-fontSize-md)"
+            weight={active ? 'fill' : undefined}
+          />
         </Box>
-        <Box sx={{ flex: '1 1 auto' }}>
-          <Typography
-            component="span"
-            sx={{ color: 'inherit', fontSize: '0.875rem', fontWeight: 500, lineHeight: '28px' }}
-          >
-            {title}
-          </Typography>
-        </Box>
+      ) : null}
+      <Box sx={{ flex: '1 1 auto' }}>
+        <Typography
+          component="span"
+          sx={{
+            color: 'inherit',
+            fontSize: '0.875rem',
+            fontWeight: depth === 0 ? 500 : 400,
+            lineHeight: '28px',
+          }}
+        >
+          {title}
+        </Typography>
       </Box>
-    </li>
+    </Box>
   );
 }

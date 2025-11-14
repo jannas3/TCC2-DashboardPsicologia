@@ -72,6 +72,7 @@ export async function listScreenings(limit = 20) {
   return prisma.screening.findMany({
     take: limit,
     orderBy: { createdAt: "desc" },
+    where: { status: { not: "CONCLUIDA" } },
     include: {
       student: {
         select: { nome: true, matricula: true, curso: true, periodo: true },

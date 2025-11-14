@@ -129,7 +129,7 @@ router.post("/", async (req: Request, res: Response) => {
     if (screeningId) {
       await prisma.screening.update({
         where: { id: screeningId },
-        data: { status: "SCHEDULED" },
+        data: { status: "CONCLUIDA" },
       });
     }
 

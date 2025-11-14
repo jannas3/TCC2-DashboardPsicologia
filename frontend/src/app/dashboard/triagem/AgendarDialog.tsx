@@ -25,7 +25,12 @@ import {
   SERVER_TZ_MINUTES,
 } from "./utils-time";
 
-import { createAppointment, type Screening, type Student } from "@/lib/api";
+import {
+  createAppointment,
+  updateScreeningStatus,
+  type Screening,
+  type Student,
+} from "@/lib/api";
 /**
  * Diálogo único de agendamento.
  * Usa screeningId (quando vier da triagem) OU studentId (quando vier do cadastro).
@@ -34,6 +39,7 @@ export type AgendarDialogUnifiedProps = {
   open: boolean;
   onClose: () => void;
   onSaved?: () => void;
+  onScreeningScheduled?: (screeningId: string) => void;
   screening?: Screening | null;
   student?: Pick<Student, "id" | "nome"> | null;
 };
@@ -50,6 +56,7 @@ export default function AgendarDialog({
   open,
   onClose,
   onSaved,
+  onScreeningScheduled,
   screening = null,
   student = null,
 }: AgendarDialogUnifiedProps) {
@@ -164,7 +171,14 @@ export default function AgendarDialog({
     console.debug("APPT payload =>", payload);
     await createAppointment(payload);
 
-    setOk("Agendamento salvo.");
+    if (hasScreening) {
+      await updateScreeningStatus(screening!.id, "concluida");
+      onScreeningScheduled?.(screening!.id);
+      setOk("Triagem movida para o histórico.");
+    } else {
+      setOk("Agendamento salvo.");
+    }
+
     onSaved?.();
     onClose();
   } catch (e: any) {
