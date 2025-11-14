@@ -3,6 +3,8 @@
 ## 📋 Sobre o Projeto
 
 O **Psicoflow** é uma plataforma completa de gestão de saúde mental desenvolvida para o Instituto Federal do Amazonas - Campus Manaus Zona Leste (IFAM CMZL). O sistema integra um chatbot de triagem via Telegram com um dashboard administrativo web, permitindo uma gestão eficiente do atendimento psicológico aos estudantes.
+<img width="1412" height="771" alt="image" src="https://github.com/user-attachments/assets/2f9347bd-99ac-4729-8d5f-5c7b9f0be379" />
+
 
 ### 🎯 Funcionalidades Principais
 
