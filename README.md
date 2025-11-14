@@ -245,6 +245,28 @@ TCC2-DashboardPsicologia/
 4. **Dependências não encontradas:**
    - Certifique-se de ter executado `npm install` nas pastas `backend` e `frontend` antes de subir os containers
 
+5. **Erro ChunkLoadError no Next.js:**
+   - Este erro geralmente ocorre quando o cache do Next.js está desatualizado ou corrompido
+   - **Solução rápida**: Limpe o cache e reinicie o container:
+     ```bash
+     # Limpar o cache do Next.js dentro do container
+     docker compose exec frontend rm -rf .next
+     
+     # Reiniciar o container do frontend
+     docker compose restart frontend
+     ```
+   - **Solução alternativa**: Se o problema persistir, reconstrua o container:
+     ```bash
+     docker compose down frontend
+     docker compose up --build frontend -d
+     ```
+   - **Limpar cache localmente** (se estiver rodando fora do Docker):
+     ```bash
+     cd frontend
+     npm run clean
+     npm run dev
+     ```
+
 ---
 
 ## 📚 Documentação Adicional
