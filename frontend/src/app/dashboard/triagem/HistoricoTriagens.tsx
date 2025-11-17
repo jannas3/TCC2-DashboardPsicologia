@@ -30,8 +30,10 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import IconButton from "@mui/material/IconButton";
 
-import { getScreeningsByStatus, type RiskLevel, type Screening } from "@/lib/api";
+import { getScreeningsByStatus, deleteScreening, type RiskLevel, type Screening } from "@/lib/api";
 
 type RiskFilter = "all" | "leve" | "moderado" | "grave";
 
@@ -227,11 +229,41 @@ function DetailsModal({ screening, onClose }: { screening: Screening | null; onC
 
             <Stack spacing={1}>
               <Typography variant="subtitle2" color="text.secondary">
-                Resumo IA
+                Análise IA
               </Typography>
-              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                {screening.resumoIa ?? screening.relatorio ?? "Resumo não disponível"}
-              </Typography>
+              {screening.analiseIa ? (
+                <Stack spacing={0.5}>
+                  {screening.analiseIa.nivel_urgencia && (
+                    <Typography variant="body2">
+                      <strong>Nível de urgência:</strong> {screening.analiseIa.nivel_urgencia.toUpperCase()}
+                    </Typography>
+                  )}
+                  {screening.analiseIa.sinais_depressao && screening.analiseIa.sinais_depressao.length > 0 && (
+                    <Typography variant="body2">
+                      <strong>Sinais de depressão:</strong> {screening.analiseIa.sinais_depressao.join(", ")}
+                    </Typography>
+                  )}
+                  {screening.analiseIa.sinais_ansiedade && screening.analiseIa.sinais_ansiedade.length > 0 && (
+                    <Typography variant="body2">
+                      <strong>Sinais de ansiedade:</strong> {screening.analiseIa.sinais_ansiedade.join(", ")}
+                    </Typography>
+                  )}
+                  {screening.analiseIa.impacto_funcional && screening.analiseIa.impacto_funcional.length > 0 && (
+                    <Typography variant="body2">
+                      <strong>Impacto funcional:</strong> {screening.analiseIa.impacto_funcional.join(", ")}
+                    </Typography>
+                  )}
+                  {screening.analiseIa.fatores_protecao && screening.analiseIa.fatores_protecao.length > 0 && (
+                    <Typography variant="body2">
+                      <strong>Fatores de proteção:</strong> {screening.analiseIa.fatores_protecao.join(", ")}
+                    </Typography>
+                  )}
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  Análise IA não disponível
+                </Typography>
+              )}
             </Stack>
 
             <Stack spacing={1}>
@@ -280,6 +312,8 @@ export default function HistoricoTriagens(): JSX.Element {
   const [query, setQuery] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [selected, setSelected] = useState<Screening | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Screening | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -298,6 +332,23 @@ export default function HistoricoTriagens(): JSX.Element {
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      setDeleteLoading(true);
+      setError(null);
+      await deleteScreening(deleteTarget.id);
+      setDeleteTarget(null);
+      // Remove a triagem da lista localmente
+      setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao excluir triagem";
+      setError(message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -348,6 +399,20 @@ export default function HistoricoTriagens(): JSX.Element {
       valueGetter: (_value, row) => row.student?.matricula ?? "",
     },
     {
+      field: "student.idade",
+      headerName: "Idade",
+      width: 80,
+      valueGetter: (_value, row) => row.student?.idade ?? null,
+      valueFormatter: (v) => v ? String(v) : "—",
+    },
+    {
+      field: "student.telefone",
+      headerName: "Telefone",
+      width: 140,
+      valueGetter: (_value, row) => row.student?.telefone ?? null,
+      valueFormatter: (v) => v ? String(v) : "—",
+    },
+    {
       field: "cursoPeriodo",
       headerName: "Curso / Período",
       width: 220,
@@ -396,16 +461,31 @@ export default function HistoricoTriagens(): JSX.Element {
     {
       field: "actions",
       headerName: "Ações",
-      width: 120,
+      width: 180,
       renderCell: (params) => (
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<VisibilityIcon fontSize="small" />}
-          onClick={() => setSelected(params.row)}
-        >
-          Ver detalhes
-        </Button>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<VisibilityIcon fontSize="small" />}
+            onClick={() => setSelected(params.row)}
+          >
+            Ver detalhes
+          </Button>
+          <Tooltip title="Excluir triagem">
+            <span>
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => setDeleteTarget(params.row)}
+                aria-label="Excluir triagem"
+                disabled={deleteLoading}
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
       ),
       sortable: false,
       filterable: false,
@@ -472,6 +552,37 @@ export default function HistoricoTriagens(): JSX.Element {
       </Box>
 
       <DetailsModal screening={selected} onClose={() => setSelected(null)} />
+
+      {/* Dialog de confirmação de exclusão */}
+      <Dialog
+        open={!!deleteTarget}
+        onClose={() => (deleteLoading ? null : setDeleteTarget(null))}
+      >
+        <DialogTitle>Excluir triagem</DialogTitle>
+        <DialogContent dividers>
+          <Typography>
+            Tem certeza de que deseja excluir a triagem de{" "}
+            <strong>{deleteTarget?.student?.nome ?? "Aluno desconhecido"}</strong>?
+            <br />
+            <br />
+            Esta ação é <strong>permanente</strong> e não pode ser desfeita.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)} disabled={deleteLoading}>
+            Cancelar
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleDelete}
+            disabled={deleteLoading}
+            startIcon={deleteLoading ? <CircularProgress size={16} /> : <DeleteOutlineIcon />}
+          >
+            {deleteLoading ? "Excluindo..." : "Excluir"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

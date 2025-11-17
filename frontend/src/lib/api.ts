@@ -49,7 +49,8 @@ async function okOrThrow<T = any>(res: Response): Promise<T> {
 
 export function authHeaders(): HeadersInit {
   if (typeof window === 'undefined') return {};
-  const t = localStorage.getItem('custom-auth-token');
+  // Tenta ambos os tokens para compatibilidade
+  const t = localStorage.getItem('psicoflow_token') || localStorage.getItem('custom-auth-token');
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 // ===================== Tipos compartilhados =====================
@@ -61,6 +62,7 @@ export interface Student {
   telegramId?: string | null;
   nome: string;
   idade: number;
+  telefone: string;
   matricula: string;
   curso: string;
   periodo: string;
@@ -94,13 +96,21 @@ export interface Screening {
   profissionalResponsavel?: string | null;
   phq9Respostas?: number[];
   gad7Respostas?: number[];
-  resumoIa?: string | null;
+  analiseIa?: {
+    nivel_urgencia?: "alta" | "media" | "baixa";
+    fatores_protecao?: string[];
+    impacto_funcional?: string[];
+    sinais_depressao?: string[];
+    sinais_ansiedade?: string[];
+  } | null;
   appointment?: {
     professional?: string | null;
   } | null;
   student: {
     nome: string;
     matricula: string;
+    idade: number;
+    telefone: string;
     curso: string;
     periodo: string;
     telegramId?: string | null;
@@ -120,7 +130,7 @@ export interface Appointment {
   channel?: string | null;
   note?: string | null;
   createdAt: string;
-  student?: { nome: string; matricula: string } | null;
+  student?: { nome: string; matricula: string; idade?: number; telefone?: string } | null;
 }
 
 // payload para criar agendamento (com screeningId OU studentId)

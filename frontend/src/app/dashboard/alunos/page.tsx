@@ -94,6 +94,7 @@ type Row = {
   curso: string;
   periodo: string;
   idade?: number;
+  telefone?: string;
   telegramId?: string | null;
   createdAt?: string;
   lastScreening?: Screening;
@@ -101,10 +102,10 @@ type Row = {
 
 /* ===================== CSV helpers (opcional) ===================== */
 function toCSV(rows: Row[]) {
-  const header = ["nome", "idade", "matricula", "curso", "periodo", "telegramId", "origem", "ultimaTriagem"];
+  const header = ["nome", "idade", "telefone", "matricula", "curso", "periodo", "telegramId", "origem", "ultimaTriagem"];
   const body = rows.map((r) => {
     const last = r.lastScreening?.createdAt ? fmtDate(r.lastScreening.createdAt) : "";
-    const vals = [r.nome, r.idade ?? "", r.matricula, r.curso, r.periodo, r.telegramId ?? "", r.origem, last];
+    const vals = [r.nome, r.idade ?? "", r.telefone ?? "", r.matricula, r.curso, r.periodo, r.telegramId ?? "", r.origem, last];
     return vals
       .map((v) => {
         const s = String(v ?? "");
@@ -127,12 +128,13 @@ function parseCSV(text: string): StudentCreate[] {
     const row: StudentCreate = {
       nome: cols[idx("nome")] || "",
       idade: Number(cols[idx("idade")] || 0),
+      telefone: cols[idx("telefone")] || "",
       matricula: cols[idx("matricula")] || "",
       curso: cols[idx("curso")] || "",
       periodo: cols[idx("periodo")] || "",
       telegramId: (cols[idx("telegramid")] || cols[idx("telegram_id")] || "") || null,
     };
-    if (row.nome && row.matricula && row.curso && row.periodo) out.push(row);
+    if (row.nome && row.matricula && row.curso && row.periodo && row.telefone) out.push(row);
   }
   return out;
 }
@@ -184,6 +186,7 @@ export default function Page() {
           curso: s.curso,
           periodo: s.periodo,
           idade: s.idade,
+          telefone: s.telefone,
           telegramId: s.telegramId ?? null,
           createdAt: s.createdAt,
           lastScreening: lastByMat.get(s.matricula),
@@ -199,6 +202,7 @@ export default function Page() {
           matricula: sc.student.matricula,
           curso: sc.student.curso,
           periodo: sc.student.periodo,
+          telefone: sc.student.telefone ?? "",
           telegramId: sc.student.telegramId ?? null,
           lastScreening: sc,
         });
@@ -233,6 +237,7 @@ export default function Page() {
       (r) =>
         r.nome.toLowerCase().includes(t) ||
         r.matricula.toLowerCase().includes(t) ||
+        (r.telefone ?? "").toLowerCase().includes(t) ||
         r.curso.toLowerCase().includes(t) ||
         r.periodo.toLowerCase().includes(t) ||
         (r.telegramId ?? "").toLowerCase().includes(t)
@@ -242,9 +247,15 @@ export default function Page() {
   // ações
   async function cadastrarAPartirDaTriagem(r: Row) {
     if (r.origem !== "TRIAGEM") return;
+    const telefone = prompt("Informe o telefone do aluno (obrigatório):");
+    if (!telefone || telefone.trim().length < 8) {
+      alert("Telefone é obrigatório e deve ter no mínimo 8 dígitos");
+      return;
+    }
     const body: StudentCreate = {
       nome: r.nome,
-      idade: 18,
+      idade: r.idade ?? 18,
+      telefone: telefone.trim(),
       matricula: r.matricula,
       curso: r.curso,
       periodo: r.periodo,
@@ -273,6 +284,20 @@ export default function Page() {
     },
     { field: "nome", headerName: "Nome", width: 240 },
     { field: "matricula", headerName: "Matrícula", width: 140 },
+    { 
+      field: "idade", 
+      headerName: "Idade", 
+      width: 80,
+      valueGetter: (_v, r) => r.idade ?? null,
+      valueFormatter: (v) => v ? String(v) : "—",
+    },
+    { 
+      field: "telefone", 
+      headerName: "Telefone", 
+      width: 140,
+      valueGetter: (_v, r) => r.telefone ?? null,
+      valueFormatter: (v) => v ? String(v) : "—",
+    },
     { field: "curso", headerName: "Curso", width: 200 },
     { field: "periodo", headerName: "Período", width: 120 },
     {
@@ -353,6 +378,7 @@ export default function Page() {
                       id: r.id,
                       nome: r.nome,
                       idade: r.idade ?? 18,
+                      telefone: r.telefone ?? "",
                       matricula: r.matricula,
                       curso: r.curso,
                       periodo: r.periodo,
@@ -551,6 +577,7 @@ function StudentDialog({
   const [form, setForm] = useState<StudentCreate>({
     nome: initial?.nome ?? "",
     idade: initial?.idade ?? 18,
+    telefone: initial?.telefone ?? "",
     matricula: initial?.matricula ?? "",
     curso: initial?.curso ?? "",
     periodo: initial?.periodo ?? "",
@@ -565,6 +592,7 @@ function StudentDialog({
     setForm({
       nome: initial?.nome ?? "",
       idade: initial?.idade ?? 18,
+      telefone: initial?.telefone ?? "",
       matricula: initial?.matricula ?? "",
       curso: initial?.curso ?? "",
       periodo: initial?.periodo ?? "",
@@ -574,13 +602,31 @@ function StudentDialog({
   }, [open, initial]);
 
   const canSave =
-    form.nome.trim().length > 2 && form.matricula.trim().length > 0 && form.curso.trim().length > 0 && form.periodo.trim().length > 0;
+    form.nome.trim().length > 2 && 
+    form.matricula.trim().length > 0 && 
+    form.curso.trim().length > 0 && 
+    form.periodo.trim().length > 0 &&
+    form.idade >= 10 && form.idade <= 100 &&
+    form.telefone.trim().length >= 8;
 
   const onSubmit = async () => {
+    // Validações adicionais
+    if (form.idade < 10 || form.idade > 100) {
+      setErr("Idade deve estar entre 10 e 100");
+      return;
+    }
+    if (form.telefone.trim().length < 8) {
+      setErr("Telefone é obrigatório e deve ter no mínimo 8 dígitos");
+      return;
+    }
+    
     try {
       setSaving(true);
       setErr(null);
-      const res = isEdit && initial?.id ? await updateStudent(initial.id, form) : await createStudent(form);
+      // Limpa telefone (remove caracteres não numéricos exceto +)
+      const telefoneLimpo = form.telefone.replace(/[^\d+]/g, '');
+      const formLimpo = { ...form, telefone: telefoneLimpo };
+      const res = isEdit && initial?.id ? await updateStudent(initial.id, formLimpo) : await createStudent(formLimpo);
       onSaved(res);
       onClose();
     } catch (e) {
@@ -614,10 +660,28 @@ function StudentDialog({
                   type="number"
                   value={form.idade}
                   onChange={(e) => setForm({ ...form, idade: Number(e.target.value || 0) })}
-                  inputProps={{ min: 0 }}
+                  inputProps={{ min: 10, max: 100 }}
                   fullWidth
+                  required
+                  error={form.idade < 10 || form.idade > 100}
+                  helperText={form.idade < 10 || form.idade > 100 ? "Idade deve estar entre 10 e 100" : ""}
                 />
               </Stack>
+              <TextField
+                label="Telefone"
+                value={form.telefone}
+                onChange={(e) => {
+                  // Remove caracteres não numéricos (exceto + no início)
+                  const value = e.target.value;
+                  const cleaned = value.replace(/[^\d+]/g, '');
+                  setForm({ ...form, telefone: cleaned });
+                }}
+                fullWidth
+                required
+                error={form.telefone.trim().length > 0 && form.telefone.trim().length < 8}
+                helperText={form.telefone.trim().length > 0 && form.telefone.trim().length < 8 ? "Telefone deve ter no mínimo 8 dígitos" : "Apenas números (ex: 92999999999 ou +5592999999999)"}
+                placeholder="92999999999 ou +5592999999999"
+              />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField label="Curso" value={form.curso} onChange={(e) => setForm({ ...form, curso: e.target.value })} fullWidth required />
                 <TextField

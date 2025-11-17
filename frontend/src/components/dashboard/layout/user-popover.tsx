@@ -55,29 +55,70 @@ export function UserPopover({ anchorEl, onClose, open }: UserPopoverProps): Reac
   const [seed, setSeed] = React.useState<number>(0);
   React.useEffect(() => setSeed(Date.now()), [user?.avatar]);
 
+  // Mantém a última foto conhecida mesmo durante logout
+  const [lastKnownAvatar, setLastKnownAvatar] = React.useState<string | undefined>();
   const [avatarSrc, setAvatarSrc] = React.useState<string | undefined>();
+  
   React.useEffect(() => {
-    setAvatarSrc(withCacheBuster(user?.avatar || DEFAULT_AVATAR, seed));
-  }, [user?.avatar, seed]);
-
-  const handleAvatarError = () => setAvatarSrc(withCacheBuster(DEFAULT_AVATAR));
-
-  const handleSignOut = React.useCallback(async () => {
-    try {
-      const { error } = await authClient.signOut();
-      if (error) return logger.error('Sign out error', error);
-      await checkSession?.();
-      router.refresh();
-    } catch (err) {
-      logger.error('Sign out error', err);
+    if (user?.avatar) {
+      // Atualiza a última foto conhecida quando há usuário com avatar
+      setLastKnownAvatar(user.avatar);
+      setAvatarSrc(withCacheBuster(user.avatar, seed));
+    } else if (user && !user.avatar) {
+      // Usuário existe mas não tem avatar, usa padrão
+      setAvatarSrc(withCacheBuster(DEFAULT_AVATAR, seed));
+    } else if (!user && lastKnownAvatar) {
+      // Durante logout, mantém a última foto conhecida
+      setAvatarSrc(withCacheBuster(lastKnownAvatar, seed));
+    } else if (!user && !lastKnownAvatar) {
+      // Sem usuário e sem foto conhecida, limpa
+      setAvatarSrc(undefined);
     }
-  }, [checkSession, router]);
+  }, [user, user?.avatar, seed, lastKnownAvatar]);
+
+  const handleAvatarError = () => {
+    if (user) {
+      // Se há usuário, tenta usar imagem padrão
+      setAvatarSrc(withCacheBuster(DEFAULT_AVATAR));
+    } else if (lastKnownAvatar) {
+      // Se não há usuário mas tem foto conhecida, mantém tentando
+      setAvatarSrc(withCacheBuster(lastKnownAvatar));
+    } else {
+      // Sem nada, limpa
+      setAvatarSrc(undefined);
+    }
+  };
+
+  const handleSignOut = React.useCallback((e: React.MouseEvent) => {
+    // Previne qualquer comportamento padrão
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Limpa o token ANTES de fechar o popover
+    try {
+      localStorage.removeItem('custom-auth-token');
+      sessionStorage.clear();
+    } catch (err) {
+      logger.error('Error clearing token', err);
+    }
+    
+    // Fecha o popover
+    onClose();
+    
+    // Redireciona IMEDIATAMENTE - sem setTimeout
+    // Usa replace para não deixar no histórico
+    window.location.replace('/auth/sign-in');
+  }, [onClose]);
+
+  const handlePopoverClose = React.useCallback((event: {}, reason: string) => {
+    onClose();
+  }, [onClose]);
 
   return (
     <Popover
       anchorEl={anchorEl}
       anchorOrigin={{ horizontal: 'left', vertical: 'bottom' }}
-      onClose={onClose}
+      onClose={handlePopoverClose}
       open={open}
       slotProps={{ paper: { sx: { width: 240 } } }}
     >
@@ -115,7 +156,11 @@ export function UserPopover({ anchorEl, onClose, open }: UserPopoverProps): Reac
           </ListItemIcon>
           Conta
         </MenuItem>
-        <MenuItem onClick={handleSignOut}>
+        <MenuItem 
+          component="button"
+          onClick={handleSignOut}
+          sx={{ width: '100%', textAlign: 'left' }}
+        >
           <ListItemIcon>
             <SignOutIcon fontSize="var(--icon-fontSize-md)" />
           </ListItemIcon>

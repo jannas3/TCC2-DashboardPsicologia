@@ -31,6 +31,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import EventIcon from "@mui/icons-material/Event";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
 
 import AgendarDialog from "@/app/dashboard/triagem/AgendarDialog";
 import {
@@ -61,12 +62,15 @@ const riskColor: Record<
   GRAVE: "error",
 };
 
+// Pesos de risco para cálculo do risco geral (usado apenas para exibição)
+// A ordenação é feita no backend por nível principal: GRAVE > MODERADO > LEVE
+// Em caso de empate, ordena por createdAt ASC (quem chegou primeiro aparece primeiro)
 const riskWeight: Record<RiskLevel, number> = {
-  MINIMO: 0,
-  LEVE: 1,
-  MODERADO: 2,
-  MODERADAMENTE_GRAVE: 3,
-  GRAVE: 4,
+  MINIMO: 1,
+  LEVE: 2,
+  MODERADO: 3,
+  MODERADAMENTE_GRAVE: 4,
+  GRAVE: 5,
 };
 
 function getOverallRisk(row: Screening): RiskLevel {
@@ -243,6 +247,20 @@ export default function Page() {
       headerName: "Matrícula",
       width: 160,
       valueGetter: (_value, row) => row?.student?.matricula ?? "",
+    },
+    {
+      field: "idade",
+      headerName: "Idade",
+      width: 80,
+      valueGetter: (_value, row) => row?.student?.idade ?? null,
+      valueFormatter: (v) => v ? String(v) : "—",
+    },
+    {
+      field: "telefone",
+      headerName: "Telefone",
+      width: 140,
+      valueGetter: (_value, row) => row?.student?.telefone ?? null,
+      valueFormatter: (v) => v ? String(v) : "—",
     },
     {
       field: "cursoPeriodo",
@@ -423,10 +441,9 @@ export default function Page() {
           slots={{ toolbar: ToolbarWrapper }}
           initialState={{
             sorting: {
-              sortModel: [
-                { field: "riscoGeral", sort: "desc" }, // risco alto primeiro
-               
-              ],
+              // Ordenação inicial desabilitada - backend já retorna ordenado por prioridade de risco + data
+              // Se o usuário quiser ordenar manualmente, pode clicar nas colunas
+              sortModel: [],
             },
             pagination: { paginationModel: { pageSize: 10, page: 0 } },
             columns: { columnVisibilityModel: { telegramId: false } },
@@ -437,7 +454,21 @@ export default function Page() {
 
       {/* Dialog: relatório */}
       <Dialog open={!!open} onClose={() => setOpen(null)} maxWidth="md" fullWidth>
-        <DialogTitle>Relatório da Triagem</DialogTitle>
+        <DialogTitle sx={{ position: "relative" }}>
+          Relatório da Triagem
+          <IconButton
+            aria-label="fechar"
+            onClick={() => setOpen(null)}
+            sx={{
+              position: "absolute",
+              right: 8,
+              top: 8,
+              color: (theme) => theme.palette.grey[500],
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={1}>
             <Typography variant="subtitle2">

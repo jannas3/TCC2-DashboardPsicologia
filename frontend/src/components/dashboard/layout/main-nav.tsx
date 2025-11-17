@@ -59,13 +59,39 @@ export function MainNav(): React.JSX.Element {
     setAvatarSeed(Date.now());
   }, [user?.avatar]);
 
+  // Mantém a última foto conhecida mesmo durante logout
+  const [lastKnownAvatar, setLastKnownAvatar] = React.useState<string | undefined>();
   const [avatarSrc, setAvatarSrc] = React.useState<string | undefined>(undefined);
+  
   React.useEffect(() => {
-    const src = user?.avatar || DEFAULT_AVATAR;
-    setAvatarSrc(withCacheBuster(src, avatarSeed));
-  }, [user?.avatar, avatarSeed]);
+    if (user?.avatar) {
+      // Atualiza a última foto conhecida quando há usuário com avatar
+      setLastKnownAvatar(user.avatar);
+      setAvatarSrc(withCacheBuster(user.avatar, avatarSeed));
+    } else if (user && !user.avatar) {
+      // Usuário existe mas não tem avatar, usa padrão
+      setAvatarSrc(withCacheBuster(DEFAULT_AVATAR, avatarSeed));
+    } else if (!user && lastKnownAvatar) {
+      // Durante logout, mantém a última foto conhecida
+      setAvatarSrc(withCacheBuster(lastKnownAvatar, avatarSeed));
+    } else if (!user && !lastKnownAvatar) {
+      // Sem usuário e sem foto conhecida, limpa
+      setAvatarSrc(undefined);
+    }
+  }, [user, user?.avatar, avatarSeed, lastKnownAvatar]);
 
-  const handleAvatarError = () => setAvatarSrc(withCacheBuster(DEFAULT_AVATAR));
+  const handleAvatarError = () => {
+    if (user) {
+      // Se há usuário, tenta usar imagem padrão
+      setAvatarSrc(withCacheBuster(DEFAULT_AVATAR));
+    } else if (lastKnownAvatar) {
+      // Se não há usuário mas tem foto conhecida, mantém tentando
+      setAvatarSrc(withCacheBuster(lastKnownAvatar));
+    } else {
+      // Sem nada, limpa
+      setAvatarSrc(undefined);
+    }
+  };
 
   const handleUserOpen = (event: React.MouseEvent<HTMLElement>) => setUserMenuEl(event.currentTarget);
   const handleUserClose = () => setUserMenuEl(null);

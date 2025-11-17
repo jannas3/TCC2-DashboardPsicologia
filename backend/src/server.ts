@@ -11,6 +11,7 @@ import screeningRoutes from "./modules/screening/screening.routes.js";
 import studentRoutes from "./modules/student/student.routes.js";
 import authRoutes from "./modules/auth/auth.routes";
 import avatarRoutes from "./modules/users/avatar.routes";
+import sessionNoteRoutes from "./modules/session-note/sessionNote.routes.js";
 import { swaggerDocument } from "./docs/swagger.js";
 
 const app = express();
@@ -30,6 +31,7 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument, { explorer: t
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 app.use("/api/auth", authRoutes);
+app.use("/api", sessionNoteRoutes); // Rotas: /api/appointments/:id/note (deve vir ANTES de /api/appointments)
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/screenings", screeningRoutes);
 app.use("/api/students", studentRoutes);

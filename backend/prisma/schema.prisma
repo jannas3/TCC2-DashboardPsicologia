@@ -12,6 +12,7 @@ model Student {
   telegramId   String?
   nome         String
   idade        Int
+  telefone     String
   matricula    String        @unique
   curso        String
   periodo      String
@@ -41,6 +42,7 @@ model Screening {
   disponibilidade String
   observacao      String?
   relatorio       String
+  analiseIa       Json?
   riskPHQ9        RiskLevel
   riskGAD7        RiskLevel
   createdAt       DateTime        @default(now())
